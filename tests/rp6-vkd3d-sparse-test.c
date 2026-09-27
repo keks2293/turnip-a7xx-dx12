@@ -103,6 +103,18 @@
  *      (B8G8R8A8_UINT = UNKNOWN_COMPAT) + swaps -> LINEAR, memreq 0x100000.
  *      0006: B8G8R8A8 family unifies on the INT compat type -> list
  *      compatible -> UBWC+tiled (memreq 0x102000), both views still EXACT.
+ *   N) planar (NV12) + SPARSE_RESIDENCY, MUTABLE off and on. This is the
+ *      ONLY MUTABLE-without-format-list combination vkd3d-proton produces by
+ *      default (resource.c, the PLANE_0 branch: sets MUTABLE, returns no
+ *      list; vkd3d's own comment calls it "just be conservative here").
+ *      N1 (no MUTABLE) -> SUCCESS on stock AND on 0004-0006; and since 0004
+ *      rejects any SPARSE_RESIDENCY image whose tile_mode is not TILE6_3, a
+ *      successful sparse create on the patched driver cannot be linear.
+ *      N2 (MUTABLE) -> SUCCESS on stock (silent linear+sparse), rejected by
+ *      0004. N3 (query) -> FORMAT_NOT_SUPPORTED everywhere, pre-existing
+ *      upstream restriction (tu_formats.cc, "Don't support multi-planar
+ *      formats with sparse yet"); vkd3d never asks it (utils.c bails out for
+ *      plane_count > 1).
  * Verdict: the INT-8888 "transform" is the invalid UNORM-image + usampler
  * combination - a format-class mismatch whose result is the spec-defined
  * "poison" texel value (a test artifact, no driver/HW bug). Real integer
@@ -1118,6 +1130,82 @@ skip_b:
     printf("vkCreateImage(MUTABLE+SPARSE_RESIDENCY, no list): %s\n", vkerr(rc5));
     if (rc5 == VK_SUCCESS)
         probe_linear_sparse(dev, q, pool, img5, "F");
+
+    /* N. Planar (NV12) + SPARSE_RESIDENCY, with and without MUTABLE.
+     *
+     * This is the one MUTABLE-without-format-list combination vkd3d-proton
+     * produces *by default*: resource.c
+     *   if (format->vk_aspect_mask & VK_IMAGE_ASPECT_PLANE_0_BIT) {
+     *       *vk_flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+     *       return false;                 // no format list
+     *   }
+     * vkd3d's own comment calls that flag "just be conservative here", i.e.
+     * it is not functionally required for planar formats. It matters because
+     * turnip forces NV12 linear whenever the image is mutable (tu_image.cc,
+     * "NV12 uses a special compression scheme for the Y channel which
+     * doesn't support reinterpretation"), and linear+sparse is exactly what
+     * 0004 refuses.
+     *
+     * Prediction from the code, to be measured here:
+     *   N1 (NV12, sparse, NO mutable)  -> SUCCESS, tiled
+     *   N2 (NV12, sparse, MUTABLE)     -> FEATURE_NOT_PRESENT (current)
+     * If N1 succeeds then dropping MUTABLE for planar+reserved/default heap
+     * in vkd3d is enough to keep the resource creatable, and no driver change
+     * is needed. SUCCESS is itself the proof of "tiled": 0004 refuses any
+     * SPARSE_RESIDENCY image whose tile_mode is not TILE6_3, so on a patched
+     * driver a successful sparse create cannot be linear. */
+    printf("\n=== N. planar NV12 + SPARSE_RESIDENCY, MUTABLE on/off ===");
+    {
+        VkImageCreateInfo iin = ii3;
+        iin.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+        iin.extent = (VkExtent3D){ 128, 128, 1 };
+        iin.mipLevels = 1;
+        iin.arrayLayers = 1;
+        iin.pNext = NULL;
+
+        /* N1: sparse, NOT mutable */
+        VkImageCreateInfo iin1 = iin;
+        iin1.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT;
+        VkImage imn1 = VK_NULL_HANDLE;
+        VkResult rcn1 = vkCreateImage(dev, &iin1, NULL, &imn1);
+        printf("N1 vkCreateImage(SPARSE_RESIDENCY, NV12, no MUTABLE): %s\n", vkerr(rcn1));
+        if (rcn1 == VK_SUCCESS) {
+            VkMemoryRequirements mrn1;
+            vkGetImageMemoryRequirements(dev, imn1, &mrn1);
+            printf("N1 memreq size=0x%llx\n", (unsigned long long)mrn1.size);
+            probe_linear_sparse(dev, q, pool, imn1, "N1");
+            vkDestroyImage(dev, imn1, NULL);
+        }
+
+        /* N2: sparse + mutable, no format list - the vkd3d default pattern */
+        VkImageCreateInfo iin2 = iin;
+        iin2.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT |
+                      VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+        VkImage imn2 = VK_NULL_HANDLE;
+        VkResult rcn2 = vkCreateImage(dev, &iin2, NULL, &imn2);
+        printf("N2 vkCreateImage(SPARSE_RESIDENCY+MUTABLE, NV12, no list): %s\n", vkerr(rcn2));
+        if (rcn2 == VK_SUCCESS) {
+            probe_linear_sparse(dev, q, pool, imn2, "N2");
+            vkDestroyImage(dev, imn2, NULL);
+        }
+
+        /* N3: query side of the same pair */
+        VkPhysicalDeviceImageFormatInfo2 ifn = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
+            .format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
+            .type = VK_IMAGE_TYPE_2D,
+            .tiling = VK_IMAGE_TILING_OPTIMAL,
+            .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                     VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+            .flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT,
+        };
+        VkImageFormatProperties2 ifpn = { VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2, NULL };
+        printf("N3 query(SPARSE_RESIDENCY, NV12, no MUTABLE): %s\n",
+               vkerr(vkGetPhysicalDeviceImageFormatProperties2(pd, &ifn, &ifpn)));
+        ifn.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+        printf("N3 query(SPARSE_RESIDENCY+MUTABLE, NV12, no list): %s\n",
+               vkerr(vkGetPhysicalDeviceImageFormatProperties2(pd, &ifn, &ifpn)));
+    }
 
     /* G0. Format-query side of the E/F hole (P1): the query must refuse
      * SPARSE_RESIDENCY for the same mutable lists that force linear tiling.
