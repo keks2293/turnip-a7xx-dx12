@@ -9,7 +9,7 @@ cd /src
 # поэтому хватит переконфигурации существующего build-каталога.
 meson configure build -Dfreedreno-kmds=msm
 
-ninja -C build -j4 src/freedreno/vulkan/libvulkan_freedreno.so
+ninja -C build -j"$(nproc)" src/freedreno/vulkan/libvulkan_freedreno.so
 
 # /out смонтирован в корень build/, а манифест ICD указывает на build/out/,
 # поэтому копируем именно туда — иначе загрузчик подхватит старый бинарник.
