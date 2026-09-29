@@ -30,11 +30,13 @@ case "$MODE" in
     [ -r "$PATCHED_ICD" ] || { echo "нет $PATCHED_ICD — собрать: scripts/build-turnip.sh" >&2; exit 1; }
     export VK_DRIVER_FILES="$PATCHED_ICD"
     # Сборка Mesa у нас с prefix=/out/usr, поэтому драйвер ищет driconf в
-    # /out/usr/share/drirc.d и не находит ничего: ни одной опции turnip, включая
-    # tu_enable_softfloat32. Без неё shaderDenormPreserveFloat32 = false, vkd3d не
-    # даёт SM 6.2 → 6.6, и игра отказывает окном «your GPU was not supported».
-    # Пакетный драйвер читает /usr/share/drirc.d сам; путь указываем только тут.
-    [ -d "$DRICONSYSCONFDIR" ] || export DRIRC_CONFIGDIR=/usr/share/drirc.d
+    # /out/usr/share/drirc.d — такого каталога на устройстве нет вообще, и ни
+    # одной опции turnip не прочиталось, включая tu_enable_softfloat32. Без неё
+    # shaderDenormPreserveFloat32 = false, vkd3d не даёт SM 6.2 → 6.6, и игра
+    # отказывает окном «your GPU was not supported».
+    # Пакетный драйвер читает /usr/share/drirc.d сам, ему путь указывать не надо.
+    # Здесь указываем на системный каталог с тем же содержимым.
+    [ -d "${DRIRC_CONFIGDIR:-/nonexistent}" ] || export DRIRC_CONFIGDIR=/usr/share/drirc.d
     ;;
   stock)
     unset VK_DRIVER_FILES DRIRC_CONFIGDIR || true
