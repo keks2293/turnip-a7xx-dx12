@@ -731,3 +731,96 @@ resident плюс ~1.1 ГБ в zram, то есть идёт свопинг; OOM 
 `api_version 1.4.341`, тогда как пакетный — `1.4.354`, и это ровно та версия,
 которую сообщает сам драйвер. На поведение не влияет, но несоответствие
 убрано (`scripts/build-turnip.sh`).
+
+## 10. Причина отказа найдена: не driconf, а `prefix=/out/usr`
+
+### 10.1. Прогон с форсом подтвердил гипотезу
+
+`VKD3D_SHADER_MODEL=6_6 scripts/run-game.sh patched 200` — **игра пошла**:
+swapchain создаётся и пересоздаётся (`1920x1080` → `1280x800`), отказа окна
+нет. Лог — `results/game-patched-sm66.log`.
+
+Тем же прогоном проверено, что env доходит до vkd3d: печатается
+`d3d12_device_caps_shader_model_override: Overriding supported shader model: 6_6.`
+То есть нерабочий `VKD3D_DEBUG=trace` — это отдельная проблема (не этот прогон),
+а переменные окружения до vkd3d доходят нормально.
+
+Отдельно: `VKD3D_FEATURE_LEVEL=12_0` на стоке (`results/game-stock-flforce.log`)
+тоже даёт рабочую игру. Это воспроизводит «факт 1» из документа в ветке
+`rp6-vkd3d-analysis` уже на RE4. Форс уровня поднимает `max_shader_model`
+только до 6_0 (`d3d12_device_caps_override`, `device.c:10888`), так что уровень
+SM в этом прогоне остаётся driver-ным.
+
+### 10.2. Почему `vulkaninfo` не показал расхождения
+
+Гейт 6.2 в vkd3d (`device.c:9750-9765`):
+
+```c
+denorm_behavior = properties.denormBehaviorIndependence != VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_NONE;
+if (denorm_behavior && properties.driverID != VK_DRIVER_ID_NVIDIA_PROPRIETARY)
+    denorm_behavior = properties.shaderDenormFlushToZeroFloat32 &&
+                      properties.shaderDenormPreserveFloat32;
+```
+
+У Adreno `FTZ32 = true`, `Preserve32 = false` — то есть SM 6.0. Но `Preserve32`
+берётся не из железа, а из driconf-опции (`tu_device.cc:1033`):
+
+```c
+/* FP32 denorm preserve has to be emulated via soft-float. ...
+ * ... but vkd3d-proton cannot emulate it itself so we have to allow it
+ * to use our emulation. */
+p->shaderDenormPreserveFloat32 = pdevice->instance->drirc.misc.enable_softfloat32;
+```
+
+и эта опция включается **только для движка vkd3d** — `00-turnip-defaults.conf:42`:
+
+```xml
+<engine engine_name_match="vkd3d">
+    <option name="tu_enable_softfloat32" value="true" />
+</engine>
+```
+
+`engine_name_match` — регулярка (`xmlconfig.c:848`), сравнивается с именем
+движка из `VkApplicationInfo`. У `vulkaninfo` движок не vkd3d, поэтому
+**оба** драйвера показывают `Preserve32 = false`, и сравнение свойств разницы
+не видело. Это и есть причина, почему кандидат «SM» выглядел опровергнутым.
+
+### 10.3. Наш драйвер не читает driconf вообще
+
+`xmlconfig.c:1360-1380`:
+
+```c
+/* parse from either $DRIRC_CONFIGDIR or $datadir/drirc.d */
+if ((configdir = os_get_option("DRIRC_CONFIGDIR"))) { ... }
+else {
+    parseConfigDir(&userData, DATADIR "/drirc.d");
+    parseOneConfigFile(&userData, SYSCONFDIR "/drirc");
+}
+```
+
+`DATADIR` берётся из `prefix`/`datadir` нашей meson-конфигурации, а она
+такая: `prefix = /out/usr`, `datadir = share` → `DATADIR = /out/usr/share`.
+Каталога `/out/usr/share/drirc.d` нет, `SYSCONFDIR` у нас тоже не про `/etc`,
+а `DRIRC_CONFIGDIR` в прогонах не задавался. Итог: **у нашего драйвера не
+прочитано ни одной driconf-опции turnip**, включая `tu_enable_softfloat32`.
+Пакетный драйвер читает `/usr/share/drirc.d/00-turnip-defaults.conf` — поэтому
+у него SM 6.6, а у нашего нет.
+
+Замер (patched + подменённый conf, движок матчится всем):
+
+```
+$ DRIRC_CONFIGDIR=/tmp/opencode/drirc-test vulkaninfo   # patched
+    shaderDenormPreserveFloat32 = true      # было false
+```
+
+Уточнение по проверке: паттерн `engine_name_match` надо брать пустым (`""`),
+а не `"."` — у `vulkaninfo` `engineName` пустая строка, а `.` требует один
+символ и не матчится.
+
+### 10.4. Что это значит и что чинить
+
+Отказ игры — не в наших патчах и не в vkd3d. Патчи 0004–0006 честно подняли
+12_0; окно появлялось из-за того, что сборка Mesa для тестов ставилась с
+`prefix=/out/usr` и потому читала пустой driconf. Правится либо указанием
+`DRIRC_CONFIGDIR=/usr/share/drirc.d` при запуске, либо сборкой с
+`-Ddatadir=/usr/share`, чтобы путь был правильным без переменной окружения.
