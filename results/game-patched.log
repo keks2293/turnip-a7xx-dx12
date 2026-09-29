@@ -1,0 +1,40 @@
+# date: 2026-09-29T10:53:34+08:00
+# VK_DRIVER_FILES=/var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+# devices (name | sparseResidencyImage2D):
+#   Turnip Adreno (TM) 740  | true
+# ---
+ProtonFixes[11880] INFO: Running protonfixes on "cachyos-11.0-20260703-slr", build at 2026-07-21 23:36:49+00:00.
+ProtonFixes[11880] INFO: Running checks
+ProtonFixes[11880] INFO: All checks successful
+ProtonFixes[11880] INFO: Using early stage global defaults for UNKNOWN (4)
+ProtonFixes[11880] INFO: No early stage global protonfix found for UNKNOWN (4)
+ProtonFixes[11880] INFO: Setting up FSR4 version default.
+ProtonFixes[11880] INFO: Automatic FSR4 upgrade enabled.
+ProtonFixes[11880] INFO: Running protonfixes on "cachyos-11.0-20260703-slr", build at 2026-07-21 23:36:49+00:00.
+ProtonFixes[11880] INFO: Running checks
+ProtonFixes[11880] INFO: All checks successful
+ProtonFixes[11880] INFO: Using main stage global defaults for UNKNOWN (4)
+ProtonFixes[11880] INFO: No main stage global protonfix found for UNKNOWN (4)
+ntsync: up and running.
+ATTENTION: default value of option tu_override_uncached_as_cache_coherent overridden by environment.
+ATTENTION: default value of option tu_override_uncached_as_cache_coherent overridden by environment.
+warn:  CreateDXGIFactory2: Ignoring flags
+info:  Game: re4.exe
+info:  DXVK: v3.0.2-2-g0ff9cd328ca23b4
+info:  Build: aarch64 clang 22.1.8
+info:  Vulkan: Found vkGetInstanceProcAddr in winevulkan.dll @ 0x6ffff95e0cc0
+info:  Extension providers:
+info:    Platform WSI
+info:    OpenVR
+info:  OpenVR: could not open registry key, status 2
+warn:  OpenVR: Failed to initialize OpenVR
+info:    OpenXR
+warn:  OpenXR: Unable to get required Vulkan instance extensions size
+info:  Enabled instance extensions:
+info:    VK_KHR_get_surface_capabilities2
+info:    VK_KHR_surface
+info:    VK_KHR_surface_maintenance1
+info:    VK_KHR_win32_surface
+err:   DxvkInstance::createInstance: Failed to create Vulkan instance
+err:   Failed to initialize DXVK.
+warn:  CreateDXGIFactory2: Ignoring flags
