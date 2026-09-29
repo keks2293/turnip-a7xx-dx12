@@ -1,2 +1,9 @@
-FROM localhost/mesa-build-fedora44-full
-RUN dnf -y install glslang-tools && dnf clean all
+# glslang нужен мезону при конфигурации: без него прерывается
+# `meson setup` (meson.build:740 ищет glslangValidator). Имя пакета в Fedora 44
+# — glslang, а не glslang-tools; в репозитории glslang-tools отсутствует, и
+# установка падает с "No match for argument".
+#
+# Базовый образ — тот же, что у scripts/build-turnip.sh, иначе не хватает
+# meson/ninja/gcc (как было в старом варианте на fedora:44 напрямую).
+FROM localhost/mesa-build-fedora44-wsi
+RUN dnf -y install glslang && dnf clean all

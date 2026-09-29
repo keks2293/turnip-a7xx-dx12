@@ -4,7 +4,25 @@ RUN dnf -y install \
         python3-mako python3-ply python3-yaml \
         libdrm-devel expat-devel zlib-devel libxml2-devel \
         vulkan-headers ccache \
+        libxcb-devel libX11-devel libXrandr-devel libxshmfence-devel \
+        xcb-util-keysyms-devel \
+        wayland-devel wayland-protocols-devel \
+        byacc bison flex \
     && dnf clean all
+
+# Блок WSI-пакетов нужен для -Dplatforms=x11,wayland. Без него мезон
+# конфигурирует сборку, но в готовом драйвере не будет ни
+# VK_KHR_xcb_surface, ни VK_KHR_wayland_surface, и любое DX12-приложение
+# под proton падает на создании инстанса (см. scripts/build-turnip.sh).
+# libxcb-devel в Fedora закрывает и xcb-randr/dri3/present/shm/xfixes,
+# libX11-devel — x11-xcb, libXrandr-devel — xrandr (xlib-lease, meson.build:2375).
+# Имена пакетов пишутся с точным регистром: в Fedora это libXrandr-devel,
+# а не libxrandr-devel, и dfn-metadata нечувствителен к регистру, поэтому
+# опечатка даёт "No match for argument" вместо понятной ошибки.
+#
+# byacc/bison/flex обязательны: без них `meson setup` обрывается на
+# meson.build:2216 (генерация парсеров), и до WSI дело не доходит.
+# ccache без них бесполезен, поэтому они ставятся вместе с тулчейном.
 
 # ccache ускоряет цикл «патч -> пересборка» (scripts/rebuild-turnip-msm.sh),
 # который иначе каждый раз компилирует Mesa заново. Кэш общий и переживает
