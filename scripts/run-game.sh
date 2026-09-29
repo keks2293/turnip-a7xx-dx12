@@ -46,7 +46,18 @@ esac
 # читает /usr/share/drirc.d сам (docs/analysis.md 10.4). unset, а не «ничего не
 # делать», — чтобы случайная переменная в окружении вызывающего не подменила
 # driconf и прогон не выглядел бы удачным по чужой причине.
+#
+# DRIRC_TEST — единственное исключение, и только для опытов: каталог с
+# изменённым driconf. Нужен, чтобы измерить цену отдельных опций turnip —
+# в частности tu_enable_softfloat32, которой нет ни в одном env-переопределении
+# драйвера, поэтому иначе не отключается (docs/analysis.md 11.1b). Имя отдельное
+# от DRIRC_CONFIGDIR, чтобы «экспериментальный» путь нельзя было задать обычной
+# переменной и не заметить этого.
 unset DRIRC_CONFIGDIR
+if [ -n "${DRIRC_TEST:-}" ]; then
+    [ -d "$DRIRC_TEST" ] || { echo "нет каталога $DRIRC_TEST" >&2; exit 1; }
+    export DRIRC_CONFIGDIR="$DRIRC_TEST"
+fi
 
 [ -x "$PROTON" ] || { echo "нет proton: $PROTON" >&2; exit 1; }
 [ -f "$GAME_EXE" ] || { echo "нет игры: $GAME_EXE" >&2; exit 1; }
