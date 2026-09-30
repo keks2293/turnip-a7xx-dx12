@@ -1,0 +1,25 @@
+Серия drirc на RE4, 2026-09-30
+переключатель: tu_override_uncached_as_cache_coherent (дриконф-опция turnip)
+протокол: HUDLOG=120, scripts/run-game.sh patched 150, p25 по кадрам fps<30
+порядок: off → base → off → base (чередование внутри дня)
+
+  offA    p25=11.6 med=11.6 n=90   (tu_override_uncached_as_cache_coherent=false)
+  base6   p25=12.6 med=12.7 n=90   (по умолчанию: FEX ставит true)
+  offB    p25=11.7 med=11.7 n=88
+  base7   p25=12.6 med=12.7 n=87
+
+Среднее: false = 11.65, true = 12.6 → выключение опции хуже на 1.0 кадр
+(~8%), оба переключения согласованы, шум серии ±0.3.
+
+Источник значения true: FEX внутри proton-cachyos-11.0-arm64 вызывает
+__wine_set_unix_env("tu_override_uncached_as_cache_coherent", "true")
+(строка зашита в files/lib/wine/aarch64-windows/libwow64fex.dll и
+libarm64ecfex.dll). Поэтому ATTENTION-строки есть во всех игровых логах,
+включая стоковый драйвер. Своё значение false FEX не перетирает —
+проверено по /proc/<pid>/environ wine-процессов (пробы drircprobe3).
+
+Вывод: опция должна оставаться true (как ставит FEX) — cached-coherent
+host-память для DL|HV|HC-аллокаций в этой конфигурации быстрее.
+Переключатель закрыт, гасить его нельзя.
+
+Файлы: fps-at-{offA,base6,offB,base7}.csv, логи game-patched-at-{offA,base6,offB,base7}.log
