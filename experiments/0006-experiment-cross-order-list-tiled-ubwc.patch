@@ -1,0 +1,189 @@
+Mixed-swap (S3): небольшой HW-эксперимент — оставить tiled+UBWC для
+same-shape mixed-swap списков вида {B8G8R8A8_UNORM, R8G8B8A8_UNORM}.
+
+Контроль (0004-0008): такой список «не uniform» → tu_image_init() выключает
+UBWC и принудительно кладёт образ в линей (memreq 0x100000). Список описывает
+один и тот же texel-блок, расходящийся только в порядке каналов, поэтому
+гипотеза: вид образа применяет swap при сэмплировании, и тайлинг+UBWC
+переживают кросс-порядковую интерпретацию.
+
+Правки (только non-sparse путь; sparse-запрос S2 намеренно не трогаем):
+  - tu_formats.cc/h: новый признак tu6_format_list_same_shape() — все форматы
+    списка одинаковой геометрии блока (каналы/биты/форма);
+  - tu_image.cc: в mutable-ветке для cross-order списка (has_swaps &&
+    !uniform && same_shape) не выключать UBWC и не принуждать линей.
+
+Прогон: scripts/build-test.sh (проба S3) + scripts/run-test.sh <icd>.
+Ожидание: S3 memreq 0x102000 (UBWC), base view EXACT, cross view = identity
+(== fill2, как в контроле), raw-перенос байт-в-байт. Любая иная классификация
+cross view или порча raw = UBWC cross-order мусор → откат.
+
+Прогон:
+    cd /var/home/armada/opencode/build/mesa-rp6
+    git apply experiments/0006-... (уже наложен в рабочем дереве)
+    podman run --rm -v $PWD:/src:Z -v /var/home/armada/opencode/build:/out:Z \
+      localhost/mesa-build-fedora44-wsi-glslang \
+      bash -c 'cd /src && ninja -C build -j4 src/freedreno/vulkan/libvulkan_freedreno.so \
+               && cp build/src/freedreno/vulkan/libvulkan_freedreno.so /out/out/'
+    scripts/run-test.sh .../freedreno_icd.json results/test-s3-ubwc.log
+
+Откат: git apply -R experiments/0006-... (git checkout не использовать:
+в файлах лежат незакоммиченные 0005-0008), затем пересборка и контрольный
+прогон — S3 обязан вернуться к линейному контролю.
+
+--- a/src/freedreno/vulkan/tu_formats.h
++++ b/src/freedreno/vulkan/tu_formats.h
+@@ -40,6 +40,16 @@
+ bool tu6_format_list_swaps_are_uniform(
+    const VkImageFormatListCreateInfo *fmt_list);
+ 
++/* EXPERIMENT (mixed-swap): true when every format of the list is the very
++ * same texel block - same channel count, bits and block shape - so the list
++ * disagrees only about which channel the bytes mean (B8G8R8A8 together with
++ * R8G8B8A8, say) and not about where the bytes live.  tu_image_init() keeps
++ * tiled+UBWC for such lists instead of the linear demotion; the S3 probe of
++ * rp6-vkd3d-sparse-test.c decides whether the views read back correctly.
++ */
++bool tu6_format_list_same_shape(
++   const VkImageFormatListCreateInfo *fmt_list);
++
+ /* True if a mutable image created with this format list has to be demoted to
+  * the linear fallback, i.e. the list reinterprets the image in a way the
+  * tiled layout cannot describe.  Sparse residency requires the tiled layout,
+--- a/src/freedreno/vulkan/tu_formats.cc
++++ b/src/freedreno/vulkan/tu_formats.cc
+@@ -221,6 +221,48 @@
+    return true;
+ }
+ 
++/* EXPERIMENT (mixed-swap): every format of the list is the very same texel
++ * block - same channel count, bits and block shape - so the list disagrees
++ * only about which channel the bytes mean (B8G8R8A8 together with R8G8B8A8,
++ * say) and not about where the bytes live.  Such a list is exactly what
++ * tu6_format_list_swaps_are_uniform() rejects while remaining one layout as
++ * far as the block geometry goes; tu_image_init() keeps tiled+UBWC for it
++ * and lets the S3 probe decide whether the views read back correctly.
++ */
++bool
++tu6_format_list_same_shape(const VkImageFormatListCreateInfo *fmt_list)
++{
++   if (!fmt_list || fmt_list->viewFormatCount < 2)
++      return false;
++
++   VkFormat first_vk_format = fmt_list->pViewFormats[0];
++   if (vk_format_is_depth_or_stencil(first_vk_format) ||
++       vk_format_is_compressed(first_vk_format) ||
++       vk_format_get_plane_count(first_vk_format) > 1)
++      return false;
++   const struct util_format_description *first =
++      util_format_description(vk_format_to_pipe_format(first_vk_format));
++
++   for (uint32_t i = 1; i < fmt_list->viewFormatCount; i++) {
++      VkFormat vk_format = fmt_list->pViewFormats[i];
++      if (vk_format_is_depth_or_stencil(vk_format) ||
++          vk_format_is_compressed(vk_format) ||
++          vk_format_get_plane_count(vk_format) > 1)
++         return false;
++
++      const struct util_format_description *desc =
++         util_format_description(vk_format_to_pipe_format(vk_format));
++
++      if (desc->nr_channels != first->nr_channels ||
++          desc->block.bits != first->block.bits ||
++          desc->block.width != first->block.width ||
++          desc->block.height != first->block.height)
++         return false;
++   }
++
++   return true;
++}
++
+ bool
+ tu6_mutable_format_list_forces_linear(const struct fd_dev_info *info,
+                                       VkFormat format,
+--- a/src/freedreno/vulkan/tu_image.cc
++++ b/src/freedreno/vulkan/tu_image.cc
+@@ -557,36 +557,56 @@
+             ubwc_enabled = false;
+             force_linear_tile = true;
+          } else if (!mutable_ubwc_fc) {
+-            if (ubwc_enabled) {
+-               if (fmt_list && fmt_list->viewFormatCount == 2) {
+-                  perf_debug(
+-                     device,
+-                     "Disabling UBWC on %dx%d %s resource due to mutable formats "
+-                     "(fmt list %s, %s)",
+-                     image->vk.extent.width, image->vk.extent.height,
+-                     util_format_name(vk_format_to_pipe_format(image->vk.format)),
+-                     util_format_name(vk_format_to_pipe_format(fmt_list->pViewFormats[0])),
+-                     util_format_name(vk_format_to_pipe_format(fmt_list->pViewFormats[1])));
+-               } else {
+-                  perf_debug(
+-                     device,
+-                     "Disabling UBWC on %dx%d %s resource due to mutable formats "
+-                     "(fmt list %s)",
+-                     image->vk.extent.width, image->vk.extent.height,
+-                     util_format_name(vk_format_to_pipe_format(image->vk.format)),
+-                     fmt_list ? "present" : "missing");
+-               }
+-               ubwc_enabled = false;
+-            }
+-
+             bool r8g8_r16 = tu6_format_list_reinterprets_r8g8_r16(vk_format_to_pipe_format(image->vk.format), fmt_list);
+             bool fmt_list_has_swaps = tu6_format_list_has_swaps(fmt_list);
+ 
+-            if (r8g8_r16 ||
+-                (fmt_list_has_swaps &&
+-                 !tu6_format_list_swaps_are_uniform(fmt_list))) {
+-               ubwc_enabled = false;
+-               force_linear_tile = true;
++            /* EXPERIMENT (mixed-swap): a non-uniform list whose members are
++             * one and the same texel block ({B8G8R8A8, R8G8B8A8}, say)
++             * describes a single layout as far as the block geometry goes -
++             * the view's own format applies the swap at sample time.  Keep
++             * tiling and UBWC for it and let the S3 probe decide; every
++             * other list keeps the original demotion.
++             */
++            bool cross_order = fmt_list_has_swaps &&
++                               !tu6_format_list_swaps_are_uniform(fmt_list) &&
++                               tu6_format_list_same_shape(fmt_list);
++
++            if (cross_order) {
++               perf_debug(
++                  device,
++                  "Keeping tiled+UBWC on %dx%d %s resource for cross-order "
++                  "mutable fmt list (experiment)",
++                  image->vk.extent.width, image->vk.extent.height,
++                  util_format_name(vk_format_to_pipe_format(image->vk.format)));
++            } else {
++               if (ubwc_enabled) {
++                  if (fmt_list && fmt_list->viewFormatCount == 2) {
++                     perf_debug(
++                        device,
++                        "Disabling UBWC on %dx%d %s resource due to mutable formats "
++                        "(fmt list %s, %s)",
++                        image->vk.extent.width, image->vk.extent.height,
++                        util_format_name(vk_format_to_pipe_format(image->vk.format)),
++                        util_format_name(vk_format_to_pipe_format(fmt_list->pViewFormats[0])),
++                        util_format_name(vk_format_to_pipe_format(fmt_list->pViewFormats[1])));
++                  } else {
++                     perf_debug(
++                        device,
++                        "Disabling UBWC on %dx%d %s resource due to mutable formats "
++                        "(fmt list %s)",
++                        image->vk.extent.width, image->vk.extent.height,
++                        util_format_name(vk_format_to_pipe_format(image->vk.format)),
++                        fmt_list ? "present" : "missing");
++                  }
++                  ubwc_enabled = false;
++               }
++
++               if (r8g8_r16 ||
++                   (fmt_list_has_swaps &&
++                    !tu6_format_list_swaps_are_uniform(fmt_list))) {
++                  ubwc_enabled = false;
++                  force_linear_tile = true;
++               }
+             }
+          } else {
+             is_mutable = true;
