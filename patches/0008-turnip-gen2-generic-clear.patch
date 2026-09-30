@@ -1,0 +1,20 @@
+diff --git a/src/freedreno/common/freedreno_devices.py b/src/freedreno/common/freedreno_devices.py
+index 31831ea8c37..00c57969407 100644
+--- a/src/freedreno/common/freedreno_devices.py
++++ b/src/freedreno/common/freedreno_devices.py
+@@ -861,6 +861,15 @@ a7xx_gen2 = GPUProps(
+         has_image_processing = True,
+         has_64b_image_atomics = True,
+         has_implicit_fragface_fragcoord_ij_linear = True,
++        # Generic clear (event-запись вместо cp_blit) и квирк-ограничитель
++        # включаются парой: квирк один ничего не делает (внешний && в
++        # use_generic_clear_for_image_clear), а без него очистки R8G8
++        # generic-путём дают GPU fault (fast-clear + размеры типа 960x540 +
++        # GMEM renderpass, tu_clear_blit.cc). Замеры 30.09.2026: vkmark
++        # vertex/shading/texture -61..-65%, RE4 0% (медиана 12.4 совпала,
++        # n=77), расхождений кадров нет. См. раздел 15 docs/analysis.md.
++        has_generic_clear = True,
++        r8g8_faulty_fast_clear_quirk = True,
+     )
+ 
+ a7xx_gen3 = GPUProps(
