@@ -1,0 +1,183 @@
+=== драйвер: /var/home/armada/opencode/build/out/freedreno_icd.json ===
+TU: info: TU_FORCE_PROPS: has_generic_clear
+TU: info: TU_FORCE_PROPS: r8g8_faulty_fast_clear_quirk
+device: Turnip Adreno (TM) 740 (chip_id 0x43050a01)
+sparseProperties: std2DBlock=1 std2DMultisample=1 std3DBlock=0 alignedMip=0 nonResidentStrict=1
+features: sparseBinding=1 sparseResidencyBuffer=1 sparseResidencyImage2D=1 sparseResidencyAliased=1 shaderResourceResidency=1 shaderResourceMinLod=1
+image memreq: size=0x100000 align=0x10000 typeBits=0x7
+sparse req[0]: gran=128x128x1 flags=0x0 mipTailLod=1 size=0x0 off=0x100000
+filled bound granule (128 x 128 px) with 0x37
+vkQueueBindSparse: SUCCESS
+RESULT A: PASS - bound tile readback ok, unbound reads 0 (PRR)
+
+=== B. alias/cast: same memory as R32_UINT ===B: create no-list mutable sparse R32_UINT: FEATURE_NOT_PRESENT - SKIPPED
+
+=== C. MUTABLE sparse probe (RGBA8 + R32_UINT fmt list) ===getImageFormatProperties2(SPARSE_RESIDENCY,RGBA8): SUCCESS
+vkCreateImage(MUTABLE+SPARSE_RESIDENCY,{RGBA8,R32_UINT}): SUCCESS
+  memreq: size=0x100000 align=0x10000
+  sparse[0]: gran=128x128x1 mipTailLod=1 off=0x100000
+C probe: PASS - MUTABLE sparse create OK + base-format RGBA8 readback clean, unbound 0
+
+=== D. view-cast probe (RGBA8 <-> R32_UINT, one image) ===  d0 y0 x0: read 0xffdddddd (want 0x37373737)
+  d0 y1 x0: read 0xffdddddd (want 0x37373737)
+  d0 y2 x0: read 0xffdddddd (want 0x37373737)
+  d0 y3 x0: read 0xffdddddd (want 0x37373737)
+  d0 y4 x0: read 0xffdddddd (want 0x37373737)
+  d0 y5 x0: read 0xffdddddd (want 0x37373737)
+  d0 y6 x0: read 0xffdddddd (want 0x37373737)
+  d0 y7 x0: read 0xffdddddd (want 0x37373737)
+  d0: 8888 TP decode TRANSFORMS constant 0x37 data on this image
+  d2 y0 x0: read 0x3f25a5a6 want 0x000000a5
+  d2 y1 x0: read 0xbfa5a5a6 want 0x000101a5
+  d2 y2 x0: read 0xbfa5a5a6 want 0x000202a5
+  d2 y3 x0: read 0xffe5e5a6 want 0x000303a5
+  d2 y4 x0: read 0xbfa5a5a6 want 0x000404a5
+  d2 y5 x0: read 0xbfa5a5a6 want 0x000505a5
+  d2 y6 x0: read 0xffe5e5a6 want 0x000606a5
+  d2 y7 x0: read 0xffe5e5a6 want 0x000707a5
+  d3: PASS - R32 view exact after d2; d2's transform lives in the 8888 read path only
+D probe: FAIL (int) - d1/d3 (R32-INT) exact, d2 (8888-INT) transformed
+                   -> int-8888 decode, not cast/layout corruption
+
+=== E. MUTABLE sparse, swap list {RGBA8, BGRA8} ===vkCreateImage(MUTABLE+SPARSE_RESIDENCY,{RGBA8,BGRA8}): FEATURE_NOT_PRESENT
+
+=== F. MUTABLE sparse, NO format list (vkd3d pattern) ===vkCreateImage(MUTABLE+SPARSE_RESIDENCY, no list): FEATURE_NOT_PRESENT
+
+=== N. planar NV12 + SPARSE_RESIDENCY, MUTABLE on/off ===N1 vkCreateImage(SPARSE_RESIDENCY, NV12, no MUTABLE): SUCCESS
+N1 memreq size=0x20000
+  N1: sparse req count=1
+  N1: gran=256x256x1
+  N1 readback: 0x37 x65536, zero x196608 - bind partially effective
+N2 vkCreateImage(SPARSE_RESIDENCY+MUTABLE, NV12, no list): FEATURE_NOT_PRESENT
+N3 query(SPARSE_RESIDENCY, NV12, no MUTABLE): FORMAT_NOT_SUPPORTED
+N3 query(SPARSE_RESIDENCY+MUTABLE, NV12, no list): FORMAT_NOT_SUPPORTED
+
+=== V. все 70 списков совместимости vkd3d против SPARSE+MUTABLE ===V[full] R32G32B32_TYPELESS       n=3 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] R32G32B32_UINT           n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] R32G32B32_SINT           n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC1_TYPELESS             n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC1_UNORM                n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC1_UNORM_SRGB           n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC2_TYPELESS             n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC2_UNORM                n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC2_UNORM_SRGB           n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC3_TYPELESS             n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC3_UNORM                n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC3_UNORM_SRGB           n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC4_TYPELESS             n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC5_TYPELESS             n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC6H_TYPELESS            n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC7_TYPELESS             n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC7_UNORM                n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] BC7_UNORM_SRGB           n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] NV12                     n=5 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] P010                     n=5 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] P016                     n=5 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[full] ИТОГ: отвергнуто связкой SPARSE+MUTABLE 0/70, не проходят и без sparse 21, зазоров query/create 0, принято 49
+V[vkd3d] R32G32B32_TYPELESS       n=3 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[vkd3d] R32G32B32_UINT           n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[vkd3d] R32G32B32_SINT           n=2 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[vkd3d] NV12                     n=5 sparse+mut=FORMAT_NOT_SUPPORTED mut=SUCCESS     sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[vkd3d] P010                     n=5 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[vkd3d] P016                     n=5 sparse+mut=FORMAT_NOT_SUPPORTED mut=FORMAT_NOT_SUPPORTED sparse=FORMAT_NOT_SUPPORTED  (не гейт: запрещён сам sparse)
+V[vkd3d] ИТОГ: отвергнуто связкой SPARSE+MUTABLE 0/70, не проходят и без sparse 6, зазоров query/create 0, принято 64
+G0 query(SPARSE_RESIDENCY+MUTABLE {RGBA8,BGRA8}): FORMAT_NOT_SUPPORTED
+G0 query(SPARSE_RESIDENCY+MUTABLE, no list):      FORMAT_NOT_SUPPORTED
+G0 query(SPARSE_RESIDENCY, non-mutable, control): SUCCESS
+
+=== G/H/K. trigger controls (tiled vs sparse vs mutable) ===G: vkCreateImage(OPTIMAL RGBA8, non-sparse): SUCCESS
+G: memreq size=0x102000 (0x100000 = plain tiled 512x512 8888; larger => UBWC metadata)
+H: vkCreateImage(OPTIMAL MUTABLE {RGBA8,R32_UINT}, non-sparse): SUCCESS
+H: memreq size=0x100000 (no UBWC metadata)
+K: vkCreateImage(SPARSE non-mutable RGBA8): SUCCESS
+K: gran=128x128x1
+M: vkCreateImage(LINEAR RGBA8): SUCCESS
+M: memreq size=0x100000 (LINEAR 512x512 8888 = 0x100000)
+Q: vkCreateImage(OPTIMAL BGRA8, non-sparse): SUCCESS
+  G y0 x0: read 0x3f25a5a6 want 0x000000a5
+  G y1 x0: read 0xbfa5a5a6 want 0x000101a5
+  G y2 x0: read 0xbfa5a5a6 want 0x000202a5
+  G y3 x0: read 0xffe5e5a6 want 0x000303a5
+  G y4 x0: read 0xbfa5a5a6 want 0x000404a5
+  G y5 x0: read 0xbfa5a5a6 want 0x000505a5
+  G y6 x0: read 0xffe5e5a6 want 0x000606a5
+  G y7 x0: read 0xffe5e5a6 want 0x000707a5
+G probe: FAIL - non-sparse tiled 8888 INT shader read TRANSFORMED
+          (int-sampler decode; tiling/sparse state irrelevant)
+G2 (R2D readback of G): EXACT - R2D 8888 self-consistent (raw); TP 8888 view is the odd one out
+  H d2' y0 x0: read 0x3f25a5a6 want 0x000000a5
+  H d2' y1 x0: read 0xbfa5a5a6 want 0x000101a5
+  H d2' y2 x0: read 0xbfa5a5a6 want 0x000202a5
+  H d2' y3 x0: read 0xffe5e5a6 want 0x000303a5
+  H d2' y4 x0: read 0xbfa5a5a6 want 0x000404a5
+  H d2' y5 x0: read 0xbfa5a5a6 want 0x000505a5
+  H d2' y6 x0: read 0xffe5e5a6 want 0x000606a5
+  H d2' y7 x0: read 0xffe5e5a6 want 0x000707a5
+H probe: FAIL (int) - d2' (8888-INT) TRANSFORMED without sparse while
+          d1' (R32-INT) exact -> int-8888 decode; sparse/mutable/tiling irrelevant
+  K y0 x0: read 0x3f25a5a6 want 0x000000a5
+  K y1 x0: read 0xbfa5a5a6 want 0x000101a5
+  K y2 x0: read 0xbfa5a5a6 want 0x000202a5
+  K y3 x0: read 0xffe5e5a6 want 0x000303a5
+  K y4 x0: read 0xbfa5a5a6 want 0x000404a5
+  K y5 x0: read 0xbfa5a5a6 want 0x000505a5
+  K y6 x0: read 0xffe5e5a6 want 0x000606a5
+  K y7 x0: read 0xffe5e5a6 want 0x000707a5
+K probe: FAIL (int) - SPARSE non-mutable 8888-INT read TRANSFORMED
+          (same int-8888 pattern; sparse irrelevant)
+  M y0 x0: read 0x3f25a5a6 want 0x000000a5
+  M y1 x0: read 0xbfa5a5a6 want 0x000101a5
+  M y2 x0: read 0xbfa5a5a6 want 0x000202a5
+  M y3 x0: read 0xffe5e5a6 want 0x000303a5
+  M y4 x0: read 0xbfa5a5a6 want 0x000404a5
+  M y5 x0: read 0xbfa5a5a6 want 0x000505a5
+  M y6 x0: read 0xffe5e5a6 want 0x000606a5
+  M y7 x0: read 0xffe5e5a6 want 0x000707a5
+M probe: FAIL (int) - LINEAR 8888-INT read TRANSFORMED too
+          (tiling irrelevant; int-sampler decode)
+  Q y0 x0: read 0xa5a60000 want 0x000000a5
+  Q y1 x0: read 0xbfa68181 want 0x000101a5
+  Q y2 x0: read 0xbda68181 want 0x000202a5
+  Q y3 x0: read 0xfde6c1c1 want 0x000303a5
+  Q y4 x0: read 0xbda68181 want 0x000404a5
+  Q y5 x0: read 0xbda6a1a1 want 0x000505a5
+  Q y6 x0: read 0xfde6c1c1 want 0x000606a5
+  Q y7 x0: read 0xfde6e1e1 want 0x000707a5
+Q probe: FAIL (int) - BGRA8 INT read TRANSFORMED too
+          (int-8888 decode bug is format-agnostic: RGBA + BGRA both hit)
+N probe: PASS - float 8888 read exact; int-sampler path is the odd one out
+O probe: PASS - sparse non-mutable 8888 FLOAT read exact
+P probe: PASS - D class (vkd3d cast pattern) FLOAT read exact
+R: vkCreateImage(OPTIMAL R8G8B8A8_UINT, non-sparse): SUCCESS
+R probe: PASS - REAL R8G8B8A8_UINT int read exact -> 8-bit int sampling works;
+          G/H/K/M/Q 'transform' is the invalid UNORM+usampler combo (UB / test artifact)
+
+=== trigger matrix (D-d2: transformed) ===
+  G  tiled, non-sparse, non-mutable 8888, INT:  TRANSFORMED
+  H  tiled, non-sparse, mutable {RGBA8,R32}:    d1'(R32) exact / d2'(8888) TRANSFORMED
+  K  tiled, sparse, non-mutable 8888, INT:      TRANSFORMED
+  M  linear 8888, INT (tiling control):         TRANSFORMED
+  Q  BGRA8 (WXYZ swap), INT:                    TRANSFORMED
+  R  REAL R8G8B8A8_UINT, INT (valid path):     exact
+  N  float sampler on G (game path):            exact
+  O  float sampler on K (sparse):               exact
+  P  float on D class (sparse+mutable):         exact
+  => ROOT CAUSE: the 'transform' is the INVALID combo UNORM-image + usampler
+     (format-class mismatch -> undefined behavior, a test artifact).
+     R (REAL R8G8B8A8_UINT + usampler) is EXACT -> real 8-bit int sampling
+     WORKS on A740. No driver/HW bug, no Mesa fix. D3D12 int path (real
+     UINT) is clean; 12_0 gate-lift safe.
+S  query(SPARSE+MUTABLE {BGRA8_UNORM,BGRA8_UINT}): SUCCESS
+S  vkCreateImage(MUTABLE+SPARSE {BGRA8_UNORM,BGRA8_UINT}): SUCCESS
+S  sparse gran=128x128x1
+S-tr transfer readback: 0/16384 mismatches (raw bytes vs fill2) - fill+bind exact
+S probe: PASS - uniform-swap BGRA+UINT sparse+mutable: create OK, UINT view exact, UNORM view exact (tiled+sparse)
+S2 query(SPARSE+MUTABLE {BGRA8,RGBA8}, mixed swap): FORMAT_NOT_SUPPORTED
+S2 query(SPARSE+MUTABLE, no list):                  FORMAT_NOT_SUPPORTED
+S2 vkCreateImage(MUTABLE+SPARSE {BGRA8,RGBA8}): FEATURE_NOT_PRESENT
+S2 vkCreateImage(MUTABLE+SPARSE, no list):       FEATURE_NOT_PRESENT
+T  vkCreateImage(OPTIMAL MUTABLE {BGRA8_UNORM,BGRA8_UINT}): SUCCESS
+T  memreq size=0x102000 (0x102000 => tiled + UBWC metadata, P6/0006)
+T-tr transfer readback: 0/262144 mismatches (raw bytes vs fill2) - bytes round-trip exact through UBWC
+T probe: PASS - UBWC+tiled (memreq 0x102000); UINT view read=EXACT, UNORM view read=EXACT, raw roundtrip=EXACT
+DONE

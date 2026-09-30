@@ -1,0 +1,67 @@
+vkmark A/B, 2026-09-30, серия из 8 прогонов (чередование base/gc/gc_r8g8/tp, round1 прямой, round2 обратный)
+окно 1280x800, winsys xcb, present=immediate, сцены clear/vertex/shading/texture
+метрика: FrameTime мс на кадр, меньше = лучше; переопределение флагов: TU_FORCE_PROPS=... (патч 0007), пересборки на каждый флаг нет
+конфиги: base — без флагов; gc — has_generic_clear; gc_r8g8 — has_generic_clear,r8g8_faulty_fast_clear_quirk;
+         tp — enable_tp_ubwc_flag_hint
+
+base clear 0.057
+base vertex 0.141
+base shading 0.158
+base texture 0.154
+gc clear 0.058
+gc vertex 0.052
+gc shading 0.067
+gc texture 0.055
+gc_r8g8 clear 0.059
+gc_r8g8 vertex 0.055
+gc_r8g8 shading 0.057
+gc_r8g8 texture 0.055
+tp clear 0.058
+tp vertex 0.141
+tp shading 0.158
+tp texture 0.153
+tp clear 0.058
+tp vertex 0.141
+tp shading 0.159
+tp texture 0.153
+gc_r8g8 clear 0.057
+gc_r8g8 vertex 0.052
+gc_r8g8 shading 0.056
+gc_r8g8 texture 0.054
+gc clear 0.057
+gc vertex 0.052
+gc shading 0.056
+gc texture 0.054
+base clear 0.057
+base vertex 0.141
+base shading 0.158
+base texture 0.153
+
+среднее по 2 прогонам и дельта к базе:
+сцена      base     gc  gc_r8g8      tp  |     gc   gc_r8g8       tp
+clear     0.057   0.058    0.058   0.058  |  +0.9%     +1.8%    +1.8%
+vertex    0.141   0.052    0.053   0.141  | -63.1%    -62.1%    +0.0%
+shading   0.158   0.061    0.057   0.159  | -61.1%    -64.2%    +0.3%
+texture   0.153   0.054    0.054   0.153  | -64.5%    -64.5%    -0.3%
+
+выводы:
+1. r8g8_faulty_fast_clear_quirk в паре с has_generic_clear не отнимает выигрыш:
+   gc_r8g8 ≈ gc во всех сценах (разница в пределах разброса прогонов).
+   То есть −60+% на vertex/shading/texture не даются снятием защиты r8g8.
+2. enable_tp_ubwc_flag_hint на a740 не даёт ничего (дельты +1.8..-0.3%,
+   то есть шум) — ожидаемо: в a7xx_gen2 он явно False с комментарием про blob v6xx.
+3. База этого дня (vertex 0.141) быстрее базы от 29.09 (vertex 0.210) —
+   между сериями менялся состав патчей в дереве; сравнивать между сериями нельзя,
+   только внутри одной.
+
+дополнение (30.09): отдельная серия по сцене clear, 6 пар base/tp вперемешку
+(проверка «+1.8%» на clear — шум или систематика):
+
+  base: 0.145 0.145 0.139 0.142 0.147 0.142   mean 0.1433  sd 0.0029
+  tp:   0.143 0.144 0.142 0.147 0.147 0.140   mean 0.1438  sd 0.0028
+  дельта +0.3%, t = |0.0005| / 0.00165 = 0.3 -> не значимо.
+
+Причина расхождения величины кадра между сериями: clear в цепочке
+(-b clear -b vertex -b shading -b texture) даёт 0.057 мс, в одиночном
+прогоне 0.143 мс. Сравнивать цифры можно только внутри одной серии.
+Вывод по enable_tp_ubwc_flag_hint: 0%, а не +1.8%.
