@@ -30,7 +30,8 @@ assert из апстрима не возвращаем: в release-сборке 
                && cp build/src/freedreno/vulkan/libvulkan_freedreno.so /out/out/'
     scripts/run-game.sh patched 200
 
-Откат: git checkout src/freedreno/vulkan/tu_image.cc
+Откат: git apply -R /var/home/armada/opencode/turnip-a7xx-dx12/experiments/0003-experiment-no-sparse-create-refusal.patch
+(git checkout этого файла не использовать: в нём лежат незакоммиченные 0005/0006.)
 
 Лог: results/raw/game-patched-norefusal.log (вне git), отфильтрованный -
 results/game-patched-norefusal.log.
