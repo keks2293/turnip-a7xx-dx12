@@ -111,7 +111,7 @@ UBWC, и это единственный неиспользованный рыч
 | что | размер | можно ли править |
 |---|---|---|
 | BC1–BC7, NV12, P010, P016 | 18 | **нет.** `vk_format_is_compressed()` и число плоскостей отсекают их раньше, чем гейт успевает подумать |
-| `R8_UNORM/UINT/SINT/SNORM`, `R8_TYPELESS` | 5 | **нет.** `has_8bpp_ubwc = false` на gen2, потолка замерами нет |
+| `R8_UNORM/UINT/SINT/SNORM`, `R8_TYPELESS` | 5 | **нет.** `has_8bpp_ubwc = false` на gen2. Потолок memreq есть (`0x40000 → 0x42000` при `FD_DEV_FEATURES=has_8bpp_ubwc=1`), но содержимое под UBWC порчено: nonmut roundtrip `65536/65536`, все нули (`results/test-r8-has8bpp-on.log`). Флаг — защита от порчи (тот же баг, что на a6xx gen2), держать false |
 | `R32G32B32_TYPELESS/UINT/SINT` | 3 | **нет.** Потолка замерами нет |
 | `R16_*`, `R10G10B10A2_*` | 8 | **да.** Потолок есть, его снимает гейт — `experiments/0011-…` |
 | `B8G8R8A8/B8G8R8X8_TYPELESS+UAV` | 2 | **нет.** В списке два разных compat-класса — `B8G8R8A8_UNORM` и `R32` |

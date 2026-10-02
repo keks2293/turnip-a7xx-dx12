@@ -3484,6 +3484,10 @@ skip_b:
             static const VkFormat f_r32g32b32a32[] = { VK_FORMAT_R32G32B32A32_SFLOAT,
                                                         VK_FORMAT_R32G32B32A32_UINT,
                                                         VK_FORMAT_R32G32B32A32_SINT };
+            static const VkFormat f_r8[] = { VK_FORMAT_R8_UNORM, VK_FORMAT_R8_UINT,
+                                             VK_FORMAT_R8_SINT, VK_FORMAT_R8_SNORM };
+            static const VkFormat f_r8u[] = { VK_FORMAT_R8_UINT, VK_FORMAT_R8_SINT,
+                                              VK_FORMAT_R8_UNORM, VK_FORMAT_R8_SNORM };
             /* Список, который vkd3d строит для typeless-BGRA8 под UAV
              * (resource.c:393-401): к B8G8R8A8_UNORM/SRGB добавляются все три
              * R32 из-за правила D3D11 про typed UAV loads. На стоке именно он
@@ -3519,6 +3523,9 @@ skip_b:
                   ARRAY_SIZE(f_r32g32b32a32), 16 },
                 { "B8G8R8A8_UAVLIST", VK_FORMAT_B8G8R8A8_UNORM, f_bgra8_uav,
                   ARRAY_SIZE(f_bgra8_uav), 4 },
+                { "R8_TYPELESS", VK_FORMAT_R8_UNORM, f_r8, ARRAY_SIZE(f_r8), 1 },
+                { "R8_UINT", VK_FORMAT_R8_UINT, f_r8u, ARRAY_SIZE(f_r8u), 1 },
+                { "R8_UNORM", VK_FORMAT_R8_UNORM, f_r8, ARRAY_SIZE(f_r8), 1 },
             };
             for (unsigned i = 0; i < ARRAY_SIZE(u); i++)
                 probe_ubwc_class(dev, q, pool, u[i].tag, u[i].base, u[i].f, u[i].n, u[i].bpt);
