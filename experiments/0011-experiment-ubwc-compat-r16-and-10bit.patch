@@ -1,0 +1,102 @@
+Эксперимент 0011 - NOT FOR COMMIT. Строки для R16_* и A2B10G10R10_* в fd6_ubwc_compat_mode().
+
+Зачем. В стоковом fd6_ubwc_compat_mode() (src/freedreno/common/freedreno_ubwc.h)
+28 форматов с непустым случаем, и среди них нет ни одного одноканального
+16-битного и ни одного packed-10-битного. Любой список форматов, в который
+vkd3d кладёт R16 (а он кладёт его всегда, R16_TYPELESS и ещё три класса),
+из-за этого молча теряет UBWC.
+
+Молча - потому что fd6_ubwc_compat_mode() для них возвращает
+FD6_UBWC_UNKNOWN_COMPAT, а tu6_mutable_format_list_ubwc_compatible() на первом
+же неизвестном члене выходит с false. Дальше ветка !mutable_ubwc_fc снимает
+ubwc_enabled, и образ остаётся tiled, но не сжатым.
+
+Это перестраховка, а не ограничение железа, и это измерено, а не выведено.
+Проба CEIL в tests/rp6-vkd3d-sparse-test.c (лог results/test-CEIL-stock.log)
+создаёт три образа с одним и тем же списком: линейный, тот же формат без
+списка, и он же с MUTABLE. Для одиночного R16_UNORM без списка приходит
+memreq 0x82000 против линейных 0x80000, то есть метаданные UBWC завелись
+сами по себе: потолок есть, и его снимает именно гейт. То же для
+A2B10G10R10_UNORM_PACK32: 0x102000 против 0x100000.
+
+В отличие от эксперимента 0008 здесь не нужно утверждать, что blob
+"allows these, but not a660" - этих форматов в blob-таблице нет вообще, и
+A2B10G10R10_UNORM_PACK32 не упоминается даже в fd6_format_table.c. Аргумент
+другой и более слабый: все варианты одного размера блока различаются только
+интерпретацией тех же битов (R16_UNORM/SNORM/UINT/SINT - 16 бит,
+A2B10G10R10_UNORM/UINT/SNORM - те же 32 бита), а tiled-раскладка зависит
+только от размера блока, как и в 0005/0006/0008.
+
+Что НЕ меняется. R8_* сюда не входит намеренно: у него нет потолка вовсе.
+has_8bpp_ubwc = false на gen2 (freedreno_devices.py, обход бага порчи текста
+из 0f770caa232, "Disable 8bpp_ubwc on a6xx gen2"), и замер это подтверждает -
+nonmemreq одиночного R8_UNORM равен линейному. R32G32B32_* - тоже: 3-компонентных
+строк в blob нет и потолка замерами не видно. Эти группы блокирует
+tu6_ubwc_possible(), а не гейт, и правкой правила они не лечатся.
+
+Имя формата в switch. Очевидное имя неверно, и это стоило одной сборки:
+VK_FORMAT_A2B10G10R10_UNORM_PACK32 отображается в PIPE_FORMAT_R10G10B10A2_UNORM
+(src/vulkan/util/vk_format.c:114), а PIPE_FORMAT_A2B10G10R10_UNORM в этот switch
+не попадает никогда, хотя в p_format.h такой формат есть. В cases стоят
+имена pipe, а не вулкана.
+
+Что остаётся за рамками эксперимента.
+ - fast-clear: байтовый roundtrip не сверяет метаданные clear, как и в 0008.
+ - переинтерпретация через R16_UINT-вид на списке R16_TYPELESS: ровно тот
+   механизм, что в 0010 оказался сломанным при расходящихся swap'ах. Здесь
+   swap'ы у всех R16_* совпадают (WZYX), так что асимметрии не будет, но
+   проверять надо отдельно.
+ - A2B10G10R10 в fd6_format_table.c нет: если список с таким форматом
+   действительно дойдёт до компиляции пути текстуры, понадобится строка
+   и там, а не только в compat-таблице.
+
+Замер и разбор: docs/analysis.md, раздел 22.
+
+diff --git a/src/freedreno/common/freedreno_ubwc.h b/src/freedreno/common/freedreno_ubwc.h
+--- a/src/freedreno/common/freedreno_ubwc.h
++++ b/src/freedreno/common/freedreno_ubwc.h
+@@ -26,6 +26,8 @@
+    FD6_UBWC_R32G32_INT,
+    FD6_UBWC_R32G32B32A32_INT,
+    FD6_UBWC_R32_FLOAT,
++   FD6_UBWC_R16_INT,
++   FD6_UBWC_A2B10G10R10_INT,
+ };
+ 
+ static inline enum fd6_ubwc_compat_type
+@@ -82,6 +84,35 @@
+    case PIPE_FORMAT_R16G16B16A16_SINT:
+       return FD6_UBWC_R16G16B16A16_INT;
+ 
++   case PIPE_FORMAT_R16_UNORM:
++   case PIPE_FORMAT_R16_SNORM:
++   case PIPE_FORMAT_R16_UINT:
++   case PIPE_FORMAT_R16_SINT:
++   case PIPE_FORMAT_R16_FLOAT:
++      /* EXPERIMENT - NOT FOR COMMIT.  The blob table has no single-channel
++       * 16-bit row at all, so every vkd3d list containing R16 (R16_TYPELESS and
++       * three more classes) silently loses UBWC.  Measured on a 740: a lone
++       * R16_UNORM image with no format list does get UBWC metadata
++       * (memreq 0x82000 vs 0x80000 linear), so the ceiling exists and the gate
++       * is what removes it.  All four variants are the same 16 bits read
++       * differently, and the tiled layout is a function of the block size
++       * alone (fd6_layout.c: layout->cpp = util_format_get_blocksize()).
++       */
++      return FD6_UBWC_R16_INT;
++
++   /* NB: vk_to_pipe_format() maps VK_FORMAT_A2B10G10R10_UNORM_PACK32 onto
++    * PIPE_FORMAT_R10G10B10A2_UNORM, not PIPE_FORMAT_A2B10G10R10_UNORM
++    * (src/vulkan/util/vk_format.c:114), so the R10G10B10A2 spelling is the
++    * one that actually reaches this switch. */
++   case PIPE_FORMAT_R10G10B10A2_UNORM:
++   case PIPE_FORMAT_R10G10B10A2_UINT:
++      /* Same argument for the packed 10-bit form, and the same measurement:
++       * a lone R10G10B10A2_UNORM image gets 0x102000 against 0x100000 linear.
++       * Unlike R16 this format is not in fd6_format_table.c either, so
++       * enabling it here only removes the gate, not the format-table gap.
++       */
++      return FD6_UBWC_A2B10G10R10_INT;
++
+    case PIPE_FORMAT_R32_UINT:
+    case PIPE_FORMAT_R32_SINT:
+       return FD6_UBWC_R32_INT;
