@@ -1,4 +1,4 @@
-Эксперимент 0011 - NOT FOR COMMIT. Строки для R16_* и A2B10G10R10_* в fd6_ubwc_compat_mode().
+Эксперимент 0011 - NOT FOR COMMIT. Строки для R16_* и R10G10B10A2_* в fd6_ubwc_compat_mode().
 
 Зачем. В стоковом fd6_ubwc_compat_mode() (src/freedreno/common/freedreno_ubwc.h)
 28 форматов с непустым случаем, и среди них нет ни одного одноканального
@@ -12,20 +12,22 @@ FD6_UBWC_UNKNOWN_COMPAT, а tu6_mutable_format_list_ubwc_compatible() на пе�
 ubwc_enabled, и образ остаётся tiled, но не сжатым.
 
 Это перестраховка, а не ограничение железа, и это измерено, а не выведено.
-Проба CEIL в tests/rp6-vkd3d-sparse-test.c (лог results/test-CEIL-stock.log)
-создаёт три образа с одним и тем же списком: линейный, тот же формат без
-списка, и он же с MUTABLE. Для одиночного R16_UNORM без списка приходит
-memreq 0x82000 против линейных 0x80000, то есть метаданные UBWC завелись
-сами по себе: потолок есть, и его снимает именно гейт. То же для
-A2B10G10R10_UNORM_PACK32: 0x102000 против 0x100000.
+Проба CEIL в tests/rp6-vkd3d-sparse-test.c (логи results/test-CEIL-base.log и
+results/test-CEIL-exp0011.log) создаёт три образа с одним и тем же списком:
+линейный, тот же формат без списка, и он же с MUTABLE. Для одиночного
+R16_UNORM без списка приходит memreq 0x82000 против линейных 0x80000, то есть
+метаданные UBWC завелись сами по себе: потолок есть, и его снимает именно гейт.
+То же для R10G10B10A2_UNORM: 0x102000 против 0x100000.
 
 В отличие от эксперимента 0008 здесь не нужно утверждать, что blob
-"allows these, but not a660" - этих форматов в blob-таблице нет вообще, и
-A2B10G10R10_UNORM_PACK32 не упоминается даже в fd6_format_table.c. Аргумент
-другой и более слабый: все варианты одного размера блока различаются только
-интерпретацией тех же битов (R16_UNORM/SNORM/UINT/SINT - 16 бит,
-A2B10G10R10_UNORM/UINT/SNORM - те же 32 бита), а tiled-раскладка зависит
-только от размера блока, как и в 0005/0006/0008.
+"allows these, but not a660". Оба формата полноценны в пути текстуры: в
+fd6_format_table.c есть VTC(R16_UNORM, ..., WZYX) (строка 72) и
+FMT(R10G10B10A2_UNORM, ..., WZYX) со строкой 209, у обоих swap WZYX, то есть
+совпадающий. Пробел только в compat-таблице, и это ровно тот случай, когда
+аргумент «все варианты одного размера блока различаются только интерпретацией
+тех же битов» стоит полностью: раскладка зависит только от размера блока
+(layout->cpp = util_format_get_blocksize(), fd6_layout.c:115), как и в
+0005/0006/0008, а swap у всех членов списка общий.
 
 Что НЕ меняется. R8_* сюда не входит намеренно: у него нет потолка вовсе.
 has_8bpp_ubwc = false на gen2 (freedreno_devices.py, обход бага порчи текста
@@ -46,11 +48,13 @@ VK_FORMAT_A2B10G10R10_UNORM_PACK32 отображается в PIPE_FORMAT_R10G1
    механизм, что в 0010 оказался сломанным при расходящихся swap'ах. Здесь
    swap'ы у всех R16_* совпадают (WZYX), так что асимметрии не будет, но
    проверять надо отдельно.
- - A2B10G10R10 в fd6_format_table.c нет: если список с таким форматом
-   действительно дойдёт до компиляции пути текстуры, понадобится строка
-   и там, а не только в compat-таблице.
+ - В compat-строку добавлены только R10G10B10A2_UNORM и _UINT, потому что
+   ровно у них в fd6_format_table.c есть тайловые записи (FMT/VTC); у SNORM,
+   SINT и USCALED там V__, то есть тайлинга нет. Если vkd3d соберёт список
+   с SNORM или SINT, вопрос упрётся уже в таблицу текстурных форматов, а не
+   в гейт, и правки этого эксперимента не хватит.
 
-Замер и разбор: docs/analysis.md, раздел 22.
+Замер и разбор: docs/analysis.md, раздел 21.6.
 
 diff --git a/src/freedreno/common/freedreno_ubwc.h b/src/freedreno/common/freedreno_ubwc.h
 --- a/src/freedreno/common/freedreno_ubwc.h
@@ -92,8 +96,8 @@ diff --git a/src/freedreno/common/freedreno_ubwc.h b/src/freedreno/common/freedr
 +   case PIPE_FORMAT_R10G10B10A2_UINT:
 +      /* Same argument for the packed 10-bit form, and the same measurement:
 +       * a lone R10G10B10A2_UNORM image gets 0x102000 against 0x100000 linear.
-+       * Unlike R16 this format is not in fd6_format_table.c either, so
-+       * enabling it here only removes the gate, not the format-table gap.
++       * Only UNORM and UINT are added, and they are exactly the two with a
++       * tiled entry (VTC) in fd6_format_table.c; SNORM and SINT have none.
 +       */
 +      return FD6_UBWC_A2B10G10R10_INT;
 +
