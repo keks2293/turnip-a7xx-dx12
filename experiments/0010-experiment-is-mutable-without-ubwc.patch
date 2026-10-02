@@ -1,0 +1,41 @@
+diff --git a/src/freedreno/vulkan/tu_image.cc b/src/freedreno/vulkan/tu_image.cc
+--- a/src/freedreno/vulkan/tu_image.cc
++++ b/src/freedreno/vulkan/tu_image.cc
+@@ -578,6 +578,37 @@
+                ubwc_enabled = false;
+             }
+ 
++            /* EXPERIMENT - NOT FOR COMMIT.  Requires experiment 0009
++             * (tu6_format_list_swaps_are_uniform(): single-channel formats
++             * do not push a list to linear), otherwise every list reached
++             * here still has force_linear_tile set and fd6_view.cc:252 gates
++             * MUTABLEEN on tile_mode == TILE6_3, so the bit would never be
++             * set.
++             *
++             * Upstream only ever reaches is_mutable = true through the
++             * gen3 `else` branch, which requires
++             * props.ubwc_all_formats_compatible - and in that branch UBWC is
++             * still on.  §14 measured two combinations and left a third one
++             * open, because both experiments kept the lists of probes T and S
++             * (identical WXYZ swap on every format, so forcing is_mutable
++             * changed no swap at all):
++             *
++             *   T  non-sparse, tiled, UBWC on,  MUTABLEEN on -> 0 -> 261120/262144
++             *   S  sparse,      tiled, UBWC off, MUTABLEEN on -> 0 -> 16384/16384
++             *   H  non-sparse, tiled, UBWC off, MUTABLEEN on -> EXACT, no change
++             *      (but H's list {RGBA8, R32_UINT} has the same WZYX swap on
++             *      both formats, so it only shows MUTABLEEN is harmless when
++             *      the swaps agree)
++             *
++             * This is the missing combination, and the one that decides the
++             * open question: tiled + UBWC *off* + MUTABLEEN on a list whose
++             * swaps actually differ.  In this branch UBWC is already off
++             * (set a few lines above), so setting is_mutable here gives
++             * exactly that, and leaves the probes with a compatible list
++             * (G, T) untouched, because they never reach this branch.
++             */
++            is_mutable = true;
++
+             bool r8g8_r16 = tu6_format_list_reinterprets_r8g8_r16(vk_format_to_pipe_format(image->vk.format), fmt_list);
+             bool fmt_list_has_swaps = tu6_format_list_has_swaps(fmt_list);
+ 

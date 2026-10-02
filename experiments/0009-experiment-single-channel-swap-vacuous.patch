@@ -1,0 +1,112 @@
+diff --git a/src/freedreno/vulkan/tu_formats.cc b/src/freedreno/vulkan/tu_formats.cc
+--- a/src/freedreno/vulkan/tu_formats.cc
++++ b/src/freedreno/vulkan/tu_formats.cc
+@@ -170,6 +170,25 @@
+  * swap, which R8G8B8A8 and B8G8R8A8 share.  Those two are not
+  * reinterpretations of each other, a list mixing them still has to fall back
+  * to linear.
++ *
++ * EXPERIMENT - NOT FOR COMMIT.  A format with a single channel has no channel
++ * order for two views to disagree about: R32_UINT reads the stored word as it
++ * is, however that word was written.  Such a format must not by itself push
++ * the list to linear; it only has to agree on the texel block, because the
++ * tiled layout is a function of the block size alone (fd6_layout.c:
++ * layout->cpp = util_format_get_blocksize()).
++ *
++ * The list this buys is the one vkd3d builds for a typeless BGRA8 resource
++ * created with D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS: the D3D11 typed
++ * UAV load rule (vkd3d-proton resource.c:393-401) appends R32{U,I,F} to every
++ * 32-bit typeless format.  On the stock check that list went linear, because
++ * B8G8R8A8 carries the WXYZ swap and R32 does not - but on the tiled layout
++ * fd6_pipe2swap() hands WZYX to *every* format that is not is_mutable
++ * (fd6_format_table.c:396), so that difference has no representation there
++ * and cannot be what demotes the image.
++ *
++ * The lists that must keep going to linear are unaffected: {BGRA8, RGBA8}
++ * (two multi-channel formats, opposite channel order) and NV12.
+  */
+ bool
+ tu6_format_list_swaps_are_uniform(const VkImageFormatListCreateInfo *fmt_list)
+@@ -177,18 +196,12 @@
+    if (!fmt_list || fmt_list->viewFormatCount < 2)
+       return false;
+ 
+-   VkFormat first_vk_format = fmt_list->pViewFormats[0];
+-   const struct util_format_description *first =
+-      util_format_description(vk_format_to_pipe_format(first_vk_format));
+-   enum a3xx_color_swap swap =
+-      tu6_format_texture(vk_format_to_pipe_format(first_vk_format),
+-                         TILE6_LINEAR, false)
+-         .swap;
+-
+-   for (uint32_t i = 1; i < fmt_list->viewFormatCount; i++) {
++   /* The reference for everything about channel order is the first format
++    * in the list that has a channel order at all.
++    */
++   enum pipe_format ref_format = PIPE_FORMAT_NONE;
++   for (uint32_t i = 0; i < fmt_list->viewFormatCount; i++) {
+       VkFormat vk_format = fmt_list->pViewFormats[i];
+-      const struct util_format_description *desc =
+-         util_format_description(vk_format_to_pipe_format(vk_format));
+ 
+       /* Layouts we don't model here (depth/stencil, compressed, multi-planar)
+        * are not something a description comparison can speak about.
+@@ -198,13 +211,40 @@
+           vk_format_get_plane_count(vk_format) > 1)
+          return false;
+ 
+-      if (desc->nr_channels != first->nr_channels ||
+-          desc->block.bits != first->block.bits ||
+-          desc->block.width != first->block.width ||
+-          desc->block.height != first->block.height ||
+-          tu6_format_texture(vk_format_to_pipe_format(vk_format),
+-                             TILE6_LINEAR, false)
+-                  .swap != swap)
++      if (util_format_description(vk_format_to_pipe_format(vk_format))
++              ->nr_channels > 1) {
++         ref_format = vk_format_to_pipe_format(vk_format);
++         break;
++      }
++   }
++
++   /* Nothing in the list has more than one channel, so nothing in it can
++    * disagree about the order of the channels of a stored word.
++    */
++   if (ref_format == PIPE_FORMAT_NONE)
++      return true;
++
++   const struct util_format_description *ref =
++      util_format_description(ref_format);
++   enum a3xx_color_swap swap =
++      tu6_format_texture(ref_format, TILE6_LINEAR, false).swap;
++
++   for (uint32_t i = 0; i < fmt_list->viewFormatCount; i++) {
++      enum pipe_format format = vk_format_to_pipe_format(fmt_list->pViewFormats[i]);
++      const struct util_format_description *desc =
++         util_format_description(format);
++
++      if (desc->block.bits != ref->block.bits ||
++          desc->block.width != ref->block.width ||
++          desc->block.height != ref->block.height)
++         return false;
++
++      /* A single channel has no channel order to disagree about. */
++      if (desc->nr_channels < 2)
++         continue;
++
++      if (desc->nr_channels != ref->nr_channels ||
++          tu6_format_texture(format, TILE6_LINEAR, false).swap != swap)
+          return false;
+ 
+       /* The swizzle is what says which channel of the stored word ends up
+@@ -212,8 +252,8 @@
+        * apart.
+        */
+       for (unsigned c = 0; c < 4; c++) {
+-         if (desc->swizzle[c] != first->swizzle[c] ||
+-             desc->channel[c].size != first->channel[c].size)
++         if (desc->swizzle[c] != ref->swizzle[c] ||
++             desc->channel[c].size != ref->channel[c].size)
+             return false;
+       }
+    }
