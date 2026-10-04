@@ -1,3 +1,10 @@
+0004: снятие гейта sparseResidencyImage2D и отказ в create для дыры
+sparse + MUTABLE -> linear.
+
+Связи: самостоятельный, ложится на чистый HEAD. 0009 опирается на
+введённый здесь отказ — снимает единственный достижимый из vkd3d путь
+в него.
+
 diff --git a/src/freedreno/vulkan/tu_device.cc b/src/freedreno/vulkan/tu_device.cc
 index e8ef94037dc..3c904bf3d70 100644
 --- a/src/freedreno/vulkan/tu_device.cc

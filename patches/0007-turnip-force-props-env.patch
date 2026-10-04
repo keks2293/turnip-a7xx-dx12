@@ -1,3 +1,8 @@
+0007: TU_FORCE_PROPS — форсировать свойства драйвера из переменной
+окружения.
+
+Связи: нет — правит только диагностику и на список форматов не влияет.
+
 diff --git a/src/freedreno/vulkan/tu_device.cc b/src/freedreno/vulkan/tu_device.cc
 index 3c904bf3d70..07f36d2c44d 100644
 --- a/src/freedreno/vulkan/tu_device.cc

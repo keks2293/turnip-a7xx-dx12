@@ -47,6 +47,9 @@ PIPE_FORMAT_Y8_UNORM, и он же уходит в tu_image_init. Совпада
 
 Upstream-пригодность: правка снимает демоцию, которая не нужна, и не добавляет
 проверок чипа, поэтому кандидат в апстрим отдельной правкой tu_image.cc.
+Связи: опирается на 0004 — снимает единственный достижимый из vkd3d путь
+в отказ, который тот вводит. Самостоятельно ложится и без 0004.
+
 diff --git a/src/freedreno/vulkan/tu_image.cc b/src/freedreno/vulkan/tu_image.cc
 --- a/src/freedreno/vulkan/tu_image.cc
 +++ b/src/freedreno/vulkan/tu_image.cc

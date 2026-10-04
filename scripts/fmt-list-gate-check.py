@@ -108,7 +108,7 @@ def why_unknown(f, props):
     if g.startswith("R32_SFLOAT") or g.startswith("R32G32_FLOAT") \
             or g.startswith("R32G32B32A32_FLOAT") or g.startswith("R16G16_FLOAT") \
             or g.startswith("R16G16B16A16_FLOAT"):
-        return "_SFLOAT вне целочисленных классов (эксп. 0008)"
+        return "_SFLOAT вне целочисленных классов (патч 0012)"
     if g.startswith("B8G8R8A8") or g.startswith("B8G8R8X8"):
         return "B8G8R8A8-семейство вне UNORM-класса (патч 0006)"
     if re.fullmatch(r"[RGBA]\d+[RGBA]\d+[RGBA]\d+[RGBA]?\d*_[A-Z0-9_]+", g):
@@ -133,8 +133,8 @@ def load_format_table(path):
 def fd6_ubwc_compat_mode(fmt, props, patch_0006=False, patch_0010=False, patch_0011=False):
     """Перенос fd6_ubwc_compat_mode() из freedreno_ubwc.h (сток).
 
-    patch_0010 — эксперимент: включить _SFLOAT-члены в целочисленные
-    compat-классы.  Сток их не включает и для R32_FLOAT прямо пишет
+    patch_0010 — патч 0012 (был экспериментом 0008): включить _SFLOAT-
+    члены в целочисленные compat-классы.  Сток их не включает и для R32_FLOAT прямо пишет
     «a630 blob allows these, but not a660» (a660 == наше семейство gen2),
     так что это проверка гипотезы, а не перенос кода.
     """
@@ -306,7 +306,7 @@ def report_0011(swap, classes, props):
     Основание — замер, а не рассуждение.  Проба CEIL (results/test-CEIL-
     stock.log) показала, что одиночный R16_UNORM и A2B10G10R10_UNORM_PACK32 без
     списка получают метаданные UBWC: потолок есть.  Список их снимает, потому
-    что fd6_ubwc_compat_mode() для них молчит.  В отличие от 0008 здесь не
+    что fd6_ubwc_compat_mode() для них молчит.  В отличие от 0012 здесь не
     нужно утверждать, что blob «allows but not a660»: форматы в blob-таблице не
     упомянуты вообще, и A2B10G10R10 нет даже в fd6_format_table.c.
     """
@@ -332,7 +332,7 @@ def report_0011(swap, classes, props):
 def report_stack(swap, classes, props, patch_0011=False):
     """Раскладка рабочего стека ArmadOS и разбор оставшихся tiled, no-UBWC.
 
-    Рабочий стек — 0004, 0005, 0006, 0008 (_SFLOAT), 0009, 0010.  0004 и 0007 на
+    Рабочий стек — 0004, 0005, 0006, 0009, 0010, 0012 (_SFLOAT).  0004 и 0007 на
     раскладку не влияют: 0004 запрещает sparse, 0007 — только диагностика.
 
     Группы порядят НЕ по префиксу имени.  Первая версия этого разбора так и
@@ -368,8 +368,8 @@ def report_stack(swap, classes, props, patch_0011=False):
         groups.setdefault(fam, []).append(name)
 
     rest = sum(len(v) for v in groups.values())
-    print(f"\n### Рабочий стек (0004, 0005, 0006, 0008, 0009, 0010"
-          f"{', 0011' if patch_0011 else ''}): из {len(classes)} классов")
+    print(f"\n### Рабочий стек (0004, 0005, 0006, 0009, 0010"
+          f"{', 0011' if patch_0011 else ''}, 0012): из {len(classes)} классов")
     print(f"  UBWC: {n_ubwc}   linear: {n_lin}   tiled, no-UBWC: {rest}\n")
     for tag, lst in sorted(groups.items(), key=lambda x: -len(x[1])):
         print(f"  [{len(lst):2}] {tag}")
@@ -740,7 +740,7 @@ def main():
         if args.blockers:
             print("\n" + "=" * 78)
             report_blockers(swap, classes, GEN2_PROPS)
-            print("\n" + "-" * 78 + "\nс поправкой эксп. 0008 (_SFLOAT -> целочисленные классы):")
+            print("\n" + "-" * 78 + "\nс патчем 0012 (_SFLOAT -> целочисленные классы):")
             report_blockers(swap, classes, GEN2_PROPS, patch_0010=True)
             if args.exp_0011:
                 print("\n" + "-" * 78 + "\nи с экспериментом 0011 (одноканальный 16 бит "
