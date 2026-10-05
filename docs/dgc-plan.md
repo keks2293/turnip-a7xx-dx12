@@ -183,6 +183,10 @@ podman как обычно.
 - Fork vkd3d: `keks2293/vkd3d-proton`, ветки `starfield`, `starfield-cmdsig-debug`.
 - Worktree mesa: `build/mesa-rp6-dgc`, ветка `dgc-starfield`, DGC-код закоммичен
   (`33a2a41e276`); посторонние грязные файлы в worktree не трогать.
+  **Push:** remote для форка mesa нет (у `origin` — апстрим gitlab, своя
+  ветка `keks2293/mesa` отсутствует), поэтому коммит локальный, а его
+  `format-patch` лежит здесь: `mesa-patches/0001-dgc-m2.0-gpu-pm4-probe.patch`
+  (нумерация своя, отдельная от `patches/` для turnip).
 - M1/M2-probe: `src/freedreno/vulkan/tu_dgc_probe.cc` (в коммите выше),
   экспорт `vkCmdTuDgcProbeDispatchEXT` — в `src/vulkan/vulkan.sym`.
 
