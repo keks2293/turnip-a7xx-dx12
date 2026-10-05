@@ -24,6 +24,7 @@ sparse-ресурс нельзя делать линейным, иначе он 
 | | |
 |---|---|
 | `docs/analysis.md` | разбор: симптом, причина, измерения, границы применимости, воспроизведение; `docs/rp6-vkd3d-analysis.md` — исходный короткий разбор (21.09.2026), из которого он вырос |
+| `docs/dgc-analysis.md` | ExecuteIndirect и `VK_EXT_device_generated_commands`: гейт vkd3d, дамп сигнатур Starfield, обзор реализаций (RADV/ANV/NV/lavapipe), выбор GPU-пути, §9 — почему у turnip одна очередь; `docs/dgc-plan.md` — план M2–M4 (этапы, риски) |
 | `patches/` | 0001–0012 — патчи Mesa, которые ship; `PATCHES.md` — происхождение 0001–0003 |
 | `experiments/` | 0001–0011 — **не** для коммита: воспроизводимые проверки выводов разбора |
 | `tests/` | `rp6-vkd3d-sparse-test.c` + шейдеры; на нём получены все результаты |
