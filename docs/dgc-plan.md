@@ -108,6 +108,8 @@ turnip: собрать минимальное ядро (записать кон�
 **M2.1 — экстеншен.** Фича/свойства/лимиты/точки входа (заглушки,
 возвращают успех). Проверка: в логе Starfield исчезает
 `Not all relevant pipeline stages ... Skipping`.
+**Статус: DONE — детали в §7** (коммит mesa `c9343de409c`); остаток
+проверки — прогон Starfield (M3).
 
 **M2.2 — layout.** Разбор токенов в дескриптор + валидация v1-объёма
 (громкий отказ). `vkGetGeneratedCommandsMemoryRequirementsEXT` — размер под
@@ -182,10 +184,11 @@ podman как обычно.
   (дамп-лог 234103 — основной), скрипт `scripts/run-starfield.sh`.
 - Fork vkd3d: `keks2293/vkd3d-proton`, ветки `starfield`, `starfield-cmdsig-debug`.
 - Worktree mesa: `build/mesa-rp6-dgc`, ветка `dgc-starfield`, DGC-код закоммичен
-  (`33a2a41e276`); посторонние грязные файлы в worktree не трогать.
+  (`33a2a41e276` M2.0, `c9343de409c` M2.1); посторонние грязные файлы в worktree не трогать.
   **Push:** remote для форка mesa нет (у `origin` — апстрим gitlab, своя
-  ветка `keks2293/mesa` отсутствует), поэтому коммит локальный, а его
-  `format-patch` лежит здесь: `mesa-patches/0001-dgc-m2.0-gpu-pm4-probe.patch`
+  ветка `keks2293/mesa` отсутствует), поэтому коммиты локальные, а их
+  `format-patch` лежат здесь: `mesa-patches/0001-dgc-m2.0-gpu-pm4-probe.patch`,
+  `mesa-patches/0001-dgc-M2.1-VK_EXT_device_generated_commands-entrypoint.patch`
   (нумерация своя, отдельная от `patches/` для turnip).
 - M1/M2-probe: `src/freedreno/vulkan/tu_dgc_probe.cc` (в коммите выше),
   экспорт `vkCmdTuDgcProbeDispatchEXT` — в `src/vulkan/vulkan.sym`.
@@ -306,3 +309,63 @@ CP на каждой итерации читал **свежий** payload, а н
 - **NVIDIA**: DGC аппаратный (QMD-хип, `nvk_cmd_buffer_alloc_qmd`).
 - У Adreno аналога `PreParserDisable` нет: в реестрах только texture/resolve
   prefetch, `CP_WAIT_IB_PFD_COMPLETE` мёртв (выше).
+
+## 7. M2.1 — результат (DONE, 05.10.2026)
+
+Коммит mesa: `c9343de409c` (ветка `dgc-starfield`, +207 строк:
+`tu_dgc.cc/h`, правки `tu_device.cc` и `vulkan/meson.build`; чужие
+грязные hunk'и в `tu_device.cc` — TU_FORCE_PROPS — в коммит не попали,
+в worktree остались как были).
+
+### Что сделано
+
+- `tu_device.cc`: `.EXT_device_generated_commands = true` в таблице
+  device_extensions; фичи `deviceGeneratedCommands` +
+  `dynamicGeneratedPipelineLayout`; свойства DGC:
+  `supportedIndirectCommandsShaderStages = ALL_GRAPHICS|COMPUTE`
+  (mesh/task в turnip нет → гейт vkd3d `device.c:2605-2621` проходит),
+  `maxIndirectSequenceCount = 1<<20`, `maxIndirectCommandsTokenCount = 128`
+  (шаблоны Starfield = 2 токена, `docs/dgc-analysis.md` §3),
+  `maxIndirectCommandsTokenOffset = 64K`, `maxIndirectCommandsIndirectStride =
+  UINT32_MAX`, inputModes `VULKAN|DXGI`. Лимиты — по образцу ANV
+  (`anv_physical_device.c:1902-1917`), у RADV tokenCount=128.
+- `tu_dgc.cc` (9 entrypoints, все обязаны существовать — vkd3d резолвит их
+  без NULL-защиты):
+  - layout create/destroy — **полноценные**, через общий слой mesa
+    `vk_indirect_command_layout_create/destroy`
+    (`src/vulkan/runtime/vk_device_generated_commands.c`): разбор токенов в
+    `pc_layouts`/`vb_layouts`, `stride` и т.д.;
+  - `vkGetGeneratedCommandsMemoryRequirementsEXT` —
+    `stride * maxSequenceCount`, alignment 256, memoryTypeBits = все
+    non-lazy типы (реальный размер PM4 придёт с M2.3+);
+  - `vkCmdPreprocessGeneratedCommandsEXT` / `vkCmdExecuteGeneratedCommandsEXT`
+    — no-op заглушки (реальные — M2.4/M2.5, execute через M2.0-путь);
+  - execution sets — dummy-объекты: vkd3d их **не создаёт** (grep по
+    vkd3d-исходникам — только определения в заголовках), функции нужны
+    лишь чтобы не быть NULL.
+- Механизм подключения (проверено по коду): фича/свойства заполняются общим
+  `vk_common_GetPhysicalDeviceFeatures2/Properties2` (генерация из
+  `vk_physical_device_features/properties_gen.py`) по
+  `supported_extensions.EXT_device_generated_commands` — отдельный хендлер
+  писать не нужно; entrypoints — weak-символы `tu_*` в генерируемой
+  `tu_device_entrypoints`, определил = подключил (vulkan.sym менять не
+  нужно, всё через `vkGetDeviceProcAddr`).
+
+### Проверка (стенд probe3, `/tmp/opencode/dgcprobe/probe3.c`)
+
+1. расширение в `vkEnumerateDeviceExtensionProperties` — ok;
+2. `deviceGeneratedCommands = true` — ok;
+3. stages = 0x3f = ALL_GRAPHICS|COMPUTE, лимиты sane — ok;
+4. device создаётся с экстеншеном (фича как просит vkd3d:
+   `dynamicGeneratedPipelineLayout = false`) — ok;
+5. все 9 entrypoints резолвятся — ok;
+6. layout `[PUSH_CONSTANT, DRAW_INDEXED]` stride 32 создаётся в обоих
+   вариантах (implicit + explicit-preprocess, как у vkd3d
+   `command.c:26817-26824`) — ok;
+7. memreq: size = 32×1000 = 32000, alignment 256 — ok;
+8. execution set create/destroy — ok.
+
+**M2.1 PASS.** Регрессия: probe2 (M2.0) — PASS.
+
+Остаток критерия M2.1 («в логе Starfield исчезает Skipping») закрывается
+прогоном M3: ждём команду, `scripts/run-starfield.sh patched 600`.

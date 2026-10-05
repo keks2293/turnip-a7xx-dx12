@@ -1,0 +1,302 @@
+From c9343de409c758615575a4477fbbbd17b6cc2314 Mon Sep 17 00:00:00 2001
+From: armada <armada@localhost>
+Date: Mon, 5 Oct 2026 14:37:59 +0800
+Subject: [PATCH] =?UTF-8?q?dgc:=20M2.1=20=E2=80=94=20VK=5FEXT=5Fdevice=5Fg?=
+ =?UTF-8?q?enerated=5Fcommands=20(=D1=84=D0=B8=D1=87=D0=B0/=D1=81=D0=B2?=
+ =?UTF-8?q?=D0=BE=D0=B9=D1=81=D1=82=D0=B2=D0=B0/entrypoints)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Объявляем расширение в turnip, чтобы vkd3d перестал отбрасывать
+ExecuteIndirect-шаблоны ("Not all relevant pipeline stages are
+supported by EXT_dgc. Skipping.").
+
+tu_device.cc:
+  - расширение в таблице device_extensions;
+  - фичи deviceGeneratedCommands + dynamicGeneratedPipelineLayout;
+  - свойства: stages = ALL_GRAPHICS|COMPUTE (mesh/task в turnip нет),
+    лимиты по образцу ANV (maxSeq=1<<20, tokenCount=128,
+    tokenOffset=64K, stride=UINT32_MAX, inputModes VULKAN|DXGI).
+
+tu_dgc.{h,cc}:
+  - layout create/destroy через общий слой mesa
+    vk_indirect_command_layout_create/destroy (полноценные);
+  - memory requirements = stride * maxSequenceCount (реальный
+    размер PM4 придёт с транслятором в M2.3+);
+  - preprocess/execute — no-op заглушки (M2.4/M2.5);
+  - execution sets — dummy-объекты: vkd3d их не создаёт, функции
+    только обязаны существовать.
+
+Проверка (стенд probe3): расширение/фича/свойства на месте,
+device создаётся с экстеншеном, все 9 entrypoints резолвятся,
+layout (implicit + explicit-preprocess, 2 токена stride=32)
+создаётся, memreq = 32*1000 = 32000/256. M2.0 probe2 — PASS
+(регрессия не появилась).
+---
+ src/freedreno/vulkan/meson.build  |   1 +
+ src/freedreno/vulkan/tu_device.cc |  25 ++++++
+ src/freedreno/vulkan/tu_dgc.cc    | 139 ++++++++++++++++++++++++++++++
+ src/freedreno/vulkan/tu_dgc.h     |  42 +++++++++
+ 4 files changed, 207 insertions(+)
+ create mode 100644 src/freedreno/vulkan/tu_dgc.cc
+ create mode 100644 src/freedreno/vulkan/tu_dgc.h
+
+diff --git a/src/freedreno/vulkan/meson.build b/src/freedreno/vulkan/meson.build
+index 2019fb4977c..0b15e74aef6 100644
+--- a/src/freedreno/vulkan/meson.build
++++ b/src/freedreno/vulkan/meson.build
+@@ -43,6 +43,7 @@ libtu_files = files(
+   'tu_cs.cc',
+   'tu_device.cc',
+   'tu_descriptor_set.cc',
++  'tu_dgc.cc',
+   'tu_dgc_probe.cc',
+   'tu_dynamic_rendering.cc',
+   'tu_event.cc',
+diff --git a/src/freedreno/vulkan/tu_device.cc b/src/freedreno/vulkan/tu_device.cc
+index 3c904bf3d70..d0a6d0fca8b 100644
+--- a/src/freedreno/vulkan/tu_device.cc
++++ b/src/freedreno/vulkan/tu_device.cc
+@@ -318,6 +318,7 @@ get_device_extensions(const struct tu_physical_device *device,
+       .EXT_descriptor_buffer = true,
+       .EXT_descriptor_indexing = true,
+       .EXT_device_address_binding_report = true,
++      .EXT_device_generated_commands = true,
+       .EXT_device_memory_report = true,
+ #ifdef VK_USE_PLATFORM_DISPLAY_KHR
+       .EXT_display_control = true,
+@@ -707,6 +708,10 @@ tu_get_features(struct tu_physical_device *pdevice,
+    /* VK_EXT_device_address_binding_report */
+    features->reportAddressBinding = true;
+ 
++   /* VK_EXT_device_generated_commands */
++   features->deviceGeneratedCommands = true;
++   features->dynamicGeneratedPipelineLayout = true;
++
+    /* VK_EXT_device_memory_report */
+    features->deviceMemoryReport = true;
+ 
+@@ -1386,6 +1391,26 @@ tu_get_properties(struct tu_physical_device *pdevice,
+    props->sampleLocationSubPixelBits = 4;
+    props->variableSampleLocations = true;
+ 
++   /* VK_EXT_device_generated_commands (M2.1: stub entry points, see tu_dgc.cc) */
++   props->maxIndirectPipelineCount = 1 << 12; /* spec minimum */
++   props->maxIndirectShaderObjectCount = 1 << 12; /* spec minimum */
++   props->maxIndirectSequenceCount = 1 << 20; /* spec minimum */
++   props->maxIndirectCommandsTokenCount = 128;
++   props->maxIndirectCommandsTokenOffset = 64 * 1024;
++   props->maxIndirectCommandsIndirectStride = UINT32_MAX;
++   props->supportedIndirectCommandsInputModes =
++      VK_INDIRECT_COMMANDS_INPUT_MODE_VULKAN_INDEX_BUFFER_EXT |
++      VK_INDIRECT_COMMANDS_INPUT_MODE_DXGI_INDEX_BUFFER_EXT;
++   /* turnip has no mesh/task shaders, so no MESH/TASK bits */
++   props->supportedIndirectCommandsShaderStages =
++      VK_SHADER_STAGE_ALL_GRAPHICS | VK_SHADER_STAGE_COMPUTE_BIT;
++   props->supportedIndirectCommandsShaderStagesPipelineBinding =
++      VK_SHADER_STAGE_ALL_GRAPHICS | VK_SHADER_STAGE_COMPUTE_BIT;
++   props->supportedIndirectCommandsShaderStagesShaderBinding =
++      VK_SHADER_STAGE_ALL_GRAPHICS | VK_SHADER_STAGE_COMPUTE_BIT;
++   props->deviceGeneratedCommandsTransformFeedback = false;
++   props->deviceGeneratedCommandsMultiDrawIndirectCount = false;
++
+    /* VK_KHR_vertex_attribute_divisor */
+    props->maxVertexAttribDivisor = UINT32_MAX;
+    props->supportsNonZeroFirstInstance = true;
+diff --git a/src/freedreno/vulkan/tu_dgc.cc b/src/freedreno/vulkan/tu_dgc.cc
+new file mode 100644
+index 00000000000..534e2720a5b
+--- /dev/null
++++ b/src/freedreno/vulkan/tu_dgc.cc
+@@ -0,0 +1,139 @@
++/*
++ * Copyright 2026 Starfield DGC development.
++ * SPDX-License-Identifier: MIT
++ *
++ * VK_EXT_device_generated_commands for turnip (M2.1).
++ *
++ * Extension advertisement is in tu_device.cc; this file provides the
++ * device entry points:
++ *  - indirect command layout create/destroy use the common mesa layer
++ *    (vk_indirect_command_layout_create/destroy) and are fully functional;
++ *  - memory requirements report stride * maxSequenceCount (real PM4 size
++ *    comes with the M2.3+ command translator);
++ *  - preprocess/execute are no-ops for now (M2.4/M2.5 emit the real
++ *    PM4 template via the M2.0 probe path);
++ *  - indirect execution sets are dummy objects: vkd3d never creates them
++ *    (no VKD3D DGC shader objects), they only must exist for the
++ *    extension to be usable.
++ */
++
++#include "util/macros.h"
++
++#include "tu_dgc.h"
++#include "tu_device.h"
++#include "vk_device.h"
++#include "vk_log.h"
++#include "vk_object.h"
++
++VKAPI_ATTR VkResult VKAPI_CALL
++tu_CreateIndirectCommandsLayoutEXT(VkDevice _device,
++                                   const VkIndirectCommandsLayoutCreateInfoEXT *pCreateInfo,
++                                   const VkAllocationCallbacks *pAllocator,
++                                   VkIndirectCommandsLayoutEXT *pIndirectCommandsLayout)
++{
++   VK_FROM_HANDLE(tu_device, device, _device);
++   struct tu_indirect_command_layout *layout;
++
++   layout = (struct tu_indirect_command_layout *)
++      vk_indirect_command_layout_create(&device->vk, pCreateInfo, pAllocator,
++                                        sizeof(*layout));
++   if (!layout)
++      return vk_error(_device, VK_ERROR_OUT_OF_HOST_MEMORY);
++
++   *pIndirectCommandsLayout = tu_indirect_command_layout_to_handle(layout);
++   return VK_SUCCESS;
++}
++
++VKAPI_ATTR void VKAPI_CALL
++tu_DestroyIndirectCommandsLayoutEXT(VkDevice _device,
++                                    VkIndirectCommandsLayoutEXT indirectCommandsLayout,
++                                    const VkAllocationCallbacks *pAllocator)
++{
++   VK_FROM_HANDLE(tu_device, device, _device);
++   VK_FROM_HANDLE(tu_indirect_command_layout, layout, indirectCommandsLayout);
++
++   if (!indirectCommandsLayout)
++      return;
++
++   vk_indirect_command_layout_destroy(&device->vk, pAllocator, &layout->vk);
++}
++
++VKAPI_ATTR void VKAPI_CALL
++tu_GetGeneratedCommandsMemoryRequirementsEXT(VkDevice _device,
++                                             const VkGeneratedCommandsMemoryRequirementsInfoEXT *pInfo,
++                                             VkMemoryRequirements2 *pMemoryRequirements)
++{
++   VK_FROM_HANDLE(tu_device, device, _device);
++   VK_FROM_HANDLE(tu_indirect_command_layout, layout, pInfo->indirectCommandsLayout);
++   const uint32_t alignment = 256;
++
++   pMemoryRequirements->memoryRequirements.size =
++      align(layout->vk.stride * pInfo->maxSequenceCount, alignment);
++   pMemoryRequirements->memoryRequirements.alignment = alignment;
++   pMemoryRequirements->memoryRequirements.memoryTypeBits =
++      (1u << device->physical_device->memory.non_lazy_type_count) - 1;
++}
++
++/* M2.1: no-op; the real CPU-side template build lands with M2.4. */
++VKAPI_ATTR void VKAPI_CALL
++tu_CmdPreprocessGeneratedCommandsEXT(VkCommandBuffer commandBuffer,
++                                     const VkGeneratedCommandsInfoEXT *pGeneratedCommandsInfo,
++                                     VkCommandBuffer stateCommandBuffer)
++{
++}
++
++/* M2.1: no-op; M2.5 dispatches the M2.0 PM4 template instead. */
++VKAPI_ATTR void VKAPI_CALL
++tu_CmdExecuteGeneratedCommandsEXT(VkCommandBuffer commandBuffer,
++                                  VkBool32 isPreprocessed,
++                                  const VkGeneratedCommandsInfoEXT *pGeneratedCommandsInfo)
++{
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL
++tu_CreateIndirectExecutionSetEXT(VkDevice _device,
++                                 const VkIndirectExecutionSetCreateInfoEXT *pCreateInfo,
++                                 const VkAllocationCallbacks *pAllocator,
++                                 VkIndirectExecutionSetEXT *pIndirectExecutionSet)
++{
++   VK_FROM_HANDLE(tu_device, device, _device);
++
++   struct tu_indirect_execution_set *ies = (struct tu_indirect_execution_set *)
++      vk_object_alloc(&device->vk, pAllocator, sizeof(*ies),
++                      VK_OBJECT_TYPE_INDIRECT_EXECUTION_SET_EXT);
++   if (!ies)
++      return vk_error(_device, VK_ERROR_OUT_OF_HOST_MEMORY);
++
++   *pIndirectExecutionSet = tu_indirect_execution_set_to_handle(ies);
++   return VK_SUCCESS;
++}
++
++VKAPI_ATTR void VKAPI_CALL
++tu_DestroyIndirectExecutionSetEXT(VkDevice _device,
++                                  VkIndirectExecutionSetEXT indirectExecutionSet,
++                                  const VkAllocationCallbacks *pAllocator)
++{
++   VK_FROM_HANDLE(tu_device, device, _device);
++   VK_FROM_HANDLE(tu_indirect_execution_set, ies, indirectExecutionSet);
++
++   if (!indirectExecutionSet)
++      return;
++
++   vk_object_free(&device->vk, pAllocator, ies);
++}
++
++VKAPI_ATTR void VKAPI_CALL
++tu_UpdateIndirectExecutionSetPipelineEXT(VkDevice _device,
++                                         VkIndirectExecutionSetEXT indirectExecutionSet,
++                                         uint32_t executionSetWriteCount,
++                                         const VkWriteIndirectExecutionSetPipelineEXT *pExecutionSetWrites)
++{
++}
++
++VKAPI_ATTR void VKAPI_CALL
++tu_UpdateIndirectExecutionSetShaderEXT(VkDevice _device,
++                                       VkIndirectExecutionSetEXT indirectExecutionSet,
++                                       uint32_t executionSetWriteCount,
++                                       const VkWriteIndirectExecutionSetShaderEXT *pExecutionSetWrites)
++{
++}
+diff --git a/src/freedreno/vulkan/tu_dgc.h b/src/freedreno/vulkan/tu_dgc.h
+new file mode 100644
+index 00000000000..b3f51e06d35
+--- /dev/null
++++ b/src/freedreno/vulkan/tu_dgc.h
+@@ -0,0 +1,42 @@
++/*
++ * Copyright 2026 Starfield DGC development.
++ * SPDX-License-Identifier: MIT
++ *
++ * VK_EXT_device_generated_commands for turnip (M2.1).
++ *
++ * Layout/execution-set object wrappers around the common mesa
++ * vk_indirect_command_layout (src/vulkan/runtime/vk_device_generated_commands.h).
++ * The vk member must stay first: vk_indirect_command_layout_create()
++ * relies on it (offsetof == 0).
++ */
++
++#ifndef TU_DGC_H
++#define TU_DGC_H
++
++#include "vk_object.h"
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++#include "vk_device_generated_commands.h"
++#ifdef __cplusplus
++}
++#endif
++
++struct tu_indirect_command_layout {
++   struct vk_indirect_command_layout vk;
++};
++
++VK_DEFINE_NONDISP_HANDLE_CASTS(tu_indirect_command_layout, vk.base,
++                               VkIndirectCommandsLayoutEXT,
++                               VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_EXT)
++
++struct tu_indirect_execution_set {
++   struct vk_object_base base;
++};
++
++VK_DEFINE_NONDISP_HANDLE_CASTS(tu_indirect_execution_set, base,
++                               VkIndirectExecutionSetEXT,
++                               VK_OBJECT_TYPE_INDIRECT_EXECUTION_SET_EXT)
++
++#endif /* TU_DGC_H */
+-- 
+2.55.0
+
