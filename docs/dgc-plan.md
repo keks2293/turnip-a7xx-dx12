@@ -102,6 +102,8 @@ turnip: собрать минимальное ядро (записать кон�
 стендом `/tmp/opencode/dgcprobe/`, что M1, + GPU-copy для чтения).
 Критерий GO: запись шейдера видна после IB. Отсекает риски R3–R4 до
 вложений в остальное.
+**Статус: GO — достигнут, детали и замеры в §6** (коммит mesa
+`33a2a41e276`).
 
 **M2.1 — экстеншен.** Фича/свойства/лимиты/точки входа (заглушки,
 возвращают успех). Проверка: в логе Starfield исчезает
@@ -150,7 +152,7 @@ podman как обычно.
 
 | # | Риск | Как проверяем |
 |---|---|---|
-| R1 | барьер «шейдерная запись → чтение из IB» на a740 (M1 доказал только `CP_MEM_WRITE`) | спайк M2.0: запись из ядра → IB-чтение; дальше держим семантику `INDIRECT_COMMAND_READ` |
+| R1 | барьер «шейдерная запись → чтение из IB» на a740 (M1 доказал только `CP_MEM_WRITE`) | **закрыт (§6): `CACHE_CLEAN + WAIT_FOR_IDLE + WAIT_FOR_ME`, 4.1–8.4 µs/dispatch, PASS 10/10 + BENCH=1000 FRESH** |
 | R2 | SS6-пролог per-sequence: точный dword-шаблон из `tu_emit_consts`/`tu6_draw_common` не снят | M2.3: выписать шаблон и сравнить с тем, что CPU эмитит в обычном draw (дамп через существующий rd-dump/cmdstream-дамп) |
 | R3 | порядок `cmd->cs` (dispatch) и `draw_cs` (IB): где flush-точки, как не получить гонку потоков | M2.0/M2.3: на стенде смотрим фактический порядок пакетов |
 | R4 | внутренний compute-шейдер в turnip — первый; слоты/размер `global->shaders` (assert в `compile_shader`) | M2.0: считаем слоты, при нехватке — отдельный BO вместо `tu6_global` |
@@ -161,8 +163,10 @@ podman как обычно.
 
 ## 4. Методы проверки
 
-- Стенд `/tmp/opencode/dgcprobe/` (probe.c + glsl-шейдеры + build.sh, podman,
-  gcc/glslang) — расширяется под DGC-вызовы (M2.3). Драйвер — только через
+- Стенд `/tmp/opencode/dgcprobe/` (probe.c + probe2 + glsl-шейдеры +
+  build.sh, podman, gcc/glslang) — расширяется под DGC-вызовы (M2.3).
+  `probe2 BENCH=N` — замер submit+GPU+wait на N probe-диспатчах с
+  детекцией stale (см. §6). Драйвер — только через
   `VK_DRIVER_FILES=build/out/freedreno_icd.json`.
 - Логи: маркеры vkd3d (`Skipping`, `DGC-skip`, `EXECUTE_INDIRECT_TEMPLATE`),
   свои лог-точки в turnip по `TU_DEBUG`-флагу (по аналогии с `tu_dgc_probe`).
@@ -177,5 +181,124 @@ podman как обычно.
 - Логи: `results/starfield/starfield-patched-20261004-*.log`
   (дамп-лог 234103 — основной), скрипт `scripts/run-starfield.sh`.
 - Fork vkd3d: `keks2293/vkd3d-proton`, ветки `starfield`, `starfield-cmdsig-debug`.
-- Worktree mesa: `build/mesa-rp6-dgc` (не трогать `git checkout` в mesa-rp6).
-- M1-probe: `src/freedreno/vulkan/tu_dgc_probe.cc` (worktree, не закоммичен).
+- Worktree mesa: `build/mesa-rp6-dgc`, ветка `dgc-starfield`, DGC-код закоммичен
+  (`33a2a41e276`); посторонние грязные файлы в worktree не трогать.
+- M1/M2-probe: `src/freedreno/vulkan/tu_dgc_probe.cc` (в коммите выше),
+  экспорт `vkCmdTuDgcProbeDispatchEXT` — в `src/vulkan/vulkan.sym`.
+
+## 6. M2.0 — результат (GO, 05.10.2026)
+
+Коммит mesa: `33a2a41e276` (ветка `dgc-starfield`, только DGC-файлы:
+`tu_cmd_buffer.cc/h`, `tu_device.h`, `tu_dgc_probe.cc`, `vulkan/meson.build`,
+`vulkan.sym`).
+
+### Что подтверждено
+
+- Внутренний compute-шейдер пишет PM4-payload (4 dword'а = `CP_MEM_WRITE`),
+  CP исполняет его через `CP_INDIRECT_BUFFER`: `marker = value`, payload
+  перезаписан, хвост (`payload[64]`) не тронут, новых фолтов в dmesg нет.
+- Фактический порядок `cmd->cs` (R3): барьер → `CP_WAIT_FOR_ME` →
+  `CP_INDIRECT_BUFFER` → verify-dispatch.
+
+### Три фикса, без которых не работало
+
+1. **Единицы push-констант в tu.** `.base` в `nir_load_push_constant`
+   трактуется как **dword-смещение** (в `tu_shader.cc:297`
+   `lower_load_push_constant` вычитает `lo_dwords`), динамическое смещение
+   уходит в **src** в байтах. Правильно:
+   `nir_load_push_constant(..., nir_imm_int(b, 8), .base = 0, .range = 24)`.
+   С `.base = 8` шейдер читал мимо (проверяется дисасмом
+   `IR3_SHADER_DEBUG=disasm,internal`: `stsc.u32 c[0], 0, 8` + чтение c0/c2).
+2. **Кодировка NOP.** `0x70108000 = pm4_pkt7_hdr(CP_NOP, 0)`
+   (`freedreno_pm4.h:65`). Залитое раньше `0x70000010` декодировалось как
+   `opcode=0, cnt=0x10` → CP opcode error в dmesg — это были следы мусора
+   при stale-чтении, а не отдельный баг.
+3. **Барьер** — основной фикс, см. ниже.
+
+### R1b: префетч PFE → `CP_WAIT_FOR_ME` вместо NOP-пада
+
+На A7XX `CP_INDIRECT_BUFFER` — PFE-вариант: содержимое цели подтягивается при
+**выборке пакета** из потока, за десятки кБ до исполнения, то есть до
+барьера. Первое лечение было тайминг-хаком: NOP-пад сдвигал выборку
+IB-пакета за барьер. Бисекция порога (1 прогон/точка, из сессии M2.0):
+
+```
+128 FAIL   136 FAIL   144 PASS   152 FAIL   160 FAIL,FAIL,PASS   256 PASS
+```
+
+Порог плавает между прогонами — потому что это сумма глубины FIFO PFP→ME и
+времени `CACHE_CLEAN`. «Магической константы из спеки» нет: глубина
+предвыборки нигде не опубликована, в `adreno_pm4.xml:262-268` описан только
+механизм — *«prefetch parser uses this packet type to determine whether to
+pre-fetch the IB»*.
+
+Решение — детерминированное рукопожатие вместо дистанции,
+`adreno_pm4.xml:406`:
+
+> CP_WAIT_FOR_ME: PFP waits until the FIFO between the PFP and the ME is empty
+
+PFP физически не может распарсить `CP_INDIRECT_BUFFER` (и начать выборку
+payload'а), пока ME не исполнит барьер. Turnip этот пакет уже умеет
+(`TU_CMD_FLAG_WAIT_FOR_ME` в `tu6_emit_flushes`, эмитится последним), в
+probe-путь он просто не добавлялся.
+
+Кандидат «подождать префетч» `CP_WAIT_IB_PFD_COMPLETE` мёртв: у него
+`variants="A2XX-A4XX"`, а опкод 0x5d на A7XX переиспользован как
+`CP_NON_CONTEXT_REG_BUNCH` (`adreno_pm4.xml:646`); комментарий
+*«unimplemented at least since a5xx fw»* — RE-вывод Rob Clark, коммит
+`f011189642c`. К тому же семантика не наша — ждать base/size-записи от
+`IB_PFD` (prefetch **disabled**), а такого пакета на A6+ нет.
+
+### Замер (probe2 `BENCH=1000`, submit+GPU+wait, 3 прогона)
+
+| вариант | корректность | µs/dispatch |
+|---|---|---|
+| без барьера (пол) | STALE, FAIL | 2.2–4.3 |
+| **`CACHE_CLEAN \| WAIT_FOR_IDLE \| WAIT_FOR_ME`** | **PASS** | **4.1–8.4** |
+| то же + явный pre-WFI | PASS | 9.3–9.4 |
+| плюс `CACHE_INVALIDATE` + `WAIT_MEM_WRITES` | PASS | 9.8–10.2 |
+| старый NOP-пад 16384 dwords (без WFM) | PASS | 596–835 |
+
+Дефолт драйвера: `CACHE_CLEAN | WAIT_FOR_IDLE | WAIT_FOR_ME`, `DGC_PAD_N=0`.
+Проверка: 5/5 одиночных PASS, `BENCH=1000` → FRESH (`marker = 999`), то есть
+CP на каждой итерации читал **свежий** payload, а не предыдущий. Старый
+вариант дороже примерно в 90 раз.
+
+Состав барьера — всё про очередность, а не про тайминг:
+
+- `CACHE_CLEAN` обязателен (без него CP читает память и видит старое);
+- `WAIT_FOR_IDLE` обязан идти **после** CLEAN: сам `CP_WAIT_FOR_ME` ждёт
+  лишь приёмки пакета CLEAN самим PFP, а не завершения чистки данными —
+  `CLEAN + WFM` без post-WFI падало;
+- явный `WFI` **до** flush избыточен — первоначальный вывод R1 отменён;
+- `CACHE_INVALIDATE` и `WAIT_MEM_WRITES` на этом пути не нужны (проверено
+  повторными записями в один и тот же адрес, BENCH=1000).
+
+### Методика
+
+- `probe2 BENCH=N` перезаписывает CB из N probe-диспатчей с `value = i` на
+  каждой итерации и меряет submit+GPU+wait. Если CP прочитал устаревший
+  payload, `marker` остаётся от предыдущей итерации → печатается `STALE`.
+- Диагностика R1a: verify-шейдер копирует `payload[0]` → `marker[1]` уже
+  **после** барьера; свежий `marker[1]` при `marker[0] = 0` доказывал, что
+  память обновлена, а stale видит именно CP/PFE.
+- Ножки под getenv (оставлены для A/B): `DGC_PAD_N`, `DGC_FL` (маска
+  flush'а), `DGC_NO_WFM`, `DGC_PRE_WFI`, `DGC_DUMP` (дамп `cmd->cs`).
+
+### Смежное: как решают AMD / Intel / NVIDIA (по коду mesa)
+
+- **Intel (ANV, `genX_cmd_dgc.c:805`)**: *«If a shader runs, flush the data
+  to make it visible to CS»* → `ANV_PIPE_DATA_CACHE_FLUSH |
+  ANV_PIPE_CS_STALL` (столбняк стримера, аналог нашего WFM), а на Gfx12+
+  ещё и `MI_ARB_CHECK { PreParserDisable = true }` — явное отключение
+  препарсера перед прыжком в GPU-записанный буфер.
+- **AMD (RADV, `radv_dgc.c`)**: PM4 тоже собирается в шейдере (`nir_pkt3`,
+  `dgc_emit_indirect_buffer`); после prepare —
+  `CS_PARTIAL_FLUSH | INV_VCACHE | INV_L2` (`radv_cmd_buffer.c:14554`),
+  контрольный trailer пишет сам CP через `PKT3_WRITE_DATA` таргетом
+  `MICRO_ENGINE` (`radv_amdgpu_cs.c:777`), а комментарий *«CP isn't coherent
+  with L2 on GFX6-8»* означает: на GFX9+ префетч когерентен с L2, дистанция
+  не нужна.
+- **NVIDIA**: DGC аппаратный (QMD-хип, `nvk_cmd_buffer_alloc_qmd`).
+- У Adreno аналога `PreParserDisable` нет: в реестрах только texture/resolve
+  prefetch, `CP_WAIT_IB_PFD_COMPLETE` мёртв (выше).
