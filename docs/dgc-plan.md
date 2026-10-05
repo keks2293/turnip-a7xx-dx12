@@ -115,6 +115,10 @@ turnip: собрать минимальное ядро (записать кон�
 (громкий отказ). `vkGetGeneratedCommandsMemoryRequirementsEXT` — размер под
 стрим с запасом (на sequence ~64 dword'а: пролог + MEM_WRITE(≤8) + WAIT +
 пакет драва).
+**Статус: DONE** (коммит mesa `1011dc1fa0e`): разбор — общий слой
+`vk_indirect_command_layout_create`, v1-валидация — громкий отказ в
+`tu_CreateIndirectCommandsLayoutEXT`, memreq = stride×count (реальный
+PM4-размер закрывается вместе с M2.3).
 
 **M2.3 — шейдер: константы + draw.** Ядро + params + dispatch + барьер +
 IB. Проверка — расширенный стенд: C-тест без vkd3d (создать layout
@@ -187,9 +191,10 @@ podman как обычно.
   (`33a2a41e276` M2.0, `c9343de409c` M2.1); посторонние грязные файлы в worktree не трогать.
   **Push:** remote для форка mesa нет (у `origin` — апстрим gitlab, своя
   ветка `keks2293/mesa` отсутствует), поэтому коммиты локальные, а их
-  `format-patch` лежат здесь: `mesa-patches/0001-dgc-m2.0-gpu-pm4-probe.patch`,
-  `mesa-patches/0001-dgc-M2.1-VK_EXT_device_generated_commands-entrypoint.patch`
-  (нумерация своя, отдельная от `patches/` для turnip).
+  `format-patch` лежат здесь: `mesa-patches/0001-dgc-M2.0-GPU-written-PM4-CP_INDIRECT_BUFFER.patch`,
+  `mesa-patches/0002-dgc-M2.1-VK_EXT_device_generated_commands-entrypoint.patch`,
+  `mesa-patches/0003-dgc-M2.2-v1-scope-validation.patch`
+  (единая серия, отдельная от `patches/` для turnip).
 - M1/M2-probe: `src/freedreno/vulkan/tu_dgc_probe.cc` (в коммите выше),
   экспорт `vkCmdTuDgcProbeDispatchEXT` — в `src/vulkan/vulkan.sym`.
 
@@ -369,3 +374,22 @@ CP на каждой итерации читал **свежий** payload, а н
 
 Остаток критерия M2.1 («в логе Starfield исчезает Skipping») закрывается
 прогоном M3: ждём команду, `scripts/run-starfield.sh patched 600`.
+
+## 8. M2.2 — результат (DONE, 05.10.2026)
+
+Коммит mesa: `1011dc1fa0e` (+22 строки в `tu_dgc.cc`).
+
+- Разбор токенов — уже делает общий `vk_indirect_command_layout_create`
+  (M2.1): `dgc_info`-маска битов по типам токенов, `pc_layouts`
+  (сортировка по dst_offset), `vb_layouts`, `stride`, `token_count`.
+- **v1-валидация (новое)**: после разбора в
+  `tu_CreateIndirectCommandsLayoutEXT` маска `dgc_info` сверяется с
+  v1-объёмом (PC, SI, IB, VB, DRAW, DRAW_INDEXED, DISPATCH); execution
+  sets / mesh / RT → `VK_ERROR_FEATURE_NOT_PRESENT` + громкий лог
+  `vk_errorf` (с dgc_info и v1-маской).
+- memreq = `stride * maxSequenceCount` — реальный размер PM4-стрима
+  (пролог + MEM_WRITE + WAIT + пакет драва) закрывается вместе с
+  транслятором M2.3, тогда же memreq станет честным.
+
+Проверка: probe3 — 9/9 PASS, п. 9 = громкий отказ на TRACE_RAYS2-токен
+(`VkResult=-8` = FEATURE_NOT_PRESENT); M2.0 probe2 — PASS.

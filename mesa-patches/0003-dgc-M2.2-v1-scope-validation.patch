@@ -1,0 +1,63 @@
+From 1011dc1fa0ef9b2a9b735462d5a027932f116a2b Mon Sep 17 00:00:00 2001
+From: armada <armada@localhost>
+Date: Mon, 5 Oct 2026 14:44:21 +0800
+Subject: [PATCH 3/3] =?UTF-8?q?dgc:=20M2.2=20=E2=80=94=20v1-scope=20valida?=
+ =?UTF-8?q?tion=20(=D0=B3=D1=80=D0=BE=D0=BC=D0=BA=D0=B8=D0=B9=20=D0=BE?=
+ =?UTF-8?q?=D1=82=D0=BA=D0=B0=D0=B7=20=D0=BD=D0=B0=20=D1=82=D0=BE=D0=BA?=
+ =?UTF-8?q?=D0=B5=D0=BD=D1=8B=20=D0=B2=D0=BD=D0=B5=20=D0=BE=D0=B1=D1=8A?=
+ =?UTF-8?q?=D1=91=D0=BC=D0=B0)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+vkCreateIndirectCommandsLayoutEXT: после разбора токенов общим слоем
+проверяем dgc_info против v1-объёма (push constants + draw/dispatch
++ count/index/vertex/sequence-index). Execution sets (shader objects),
+mesh и RT-токены — VK_ERROR_FEATURE_NOT_PRESENT с логом.
+
+Разбор токенов в pc_layouts/vb_layouts/dgc_info уже делает общий
+vk_indirect_command_layout_create (src/vulkan/runtime); memreq =
+stride * maxSequenceCount (реальный размер PM4-стрима придёт с M2.3+).
+
+Проверка: probe3 — 9/9 PASS (включая отказ на TRACE_RAYS2-токен,
+VkResult=-8), M2.0 probe2 — PASS.
+---
+ src/freedreno/vulkan/tu_dgc.cc | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/src/freedreno/vulkan/tu_dgc.cc b/src/freedreno/vulkan/tu_dgc.cc
+index 534e2720a5b..a3e1ba50d61 100644
+--- a/src/freedreno/vulkan/tu_dgc.cc
++++ b/src/freedreno/vulkan/tu_dgc.cc
+@@ -40,6 +40,28 @@ tu_CreateIndirectCommandsLayoutEXT(VkDevice _device,
+    if (!layout)
+       return vk_error(_device, VK_ERROR_OUT_OF_HOST_MEMORY);
+ 
++   /* M2.2: v1 scope — push constants + draw/dispatch (+ count/index/vertex
++    * buffers, sequence index). Execution sets (shader objects), mesh and
++    * ray-tracing tokens are rejected loudly.
++    */
++   const uint32_t v1_dgc_info =
++      BITFIELD_BIT(MESA_VK_DGC_PC) |
++      BITFIELD_BIT(MESA_VK_DGC_SI) |
++      BITFIELD_BIT(MESA_VK_DGC_IB) |
++      BITFIELD_BIT(MESA_VK_DGC_VB) |
++      BITFIELD_BIT(MESA_VK_DGC_DRAW) |
++      BITFIELD_BIT(MESA_VK_DGC_DRAW_INDEXED) |
++      BITFIELD_BIT(MESA_VK_DGC_DISPATCH);
++   if ((layout->vk.dgc_info & ~v1_dgc_info) != 0) {
++      const VkResult err = vk_errorf(
++         _device, VK_ERROR_FEATURE_NOT_PRESENT,
++         "DGC layout uses tokens outside the turnip v1 scope (dgc_info=0x%x, "
++         "v1=0x%x: execution sets/mesh/RT not supported yet)",
++         layout->vk.dgc_info, v1_dgc_info);
++      vk_indirect_command_layout_destroy(&device->vk, pAllocator, &layout->vk);
++      return err;
++   }
++
+    *pIndirectCommandsLayout = tu_indirect_command_layout_to_handle(layout);
+    return VK_SUCCESS;
+ }
+-- 
+2.55.0
+
