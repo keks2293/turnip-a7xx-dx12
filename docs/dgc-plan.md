@@ -393,3 +393,236 @@ CP на каждой итерации читал **свежий** payload, а н
 
 Проверка: probe3 — 9/9 PASS, п. 9 = громкий отказ на TRACE_RAYS2-токен
 (`VkResult=-8` = FEATURE_NOT_PRESENT); M2.0 probe2 — PASS.
+
+## 9. M2.3 — «draw не виден»: причина найдена — неверный ветер в пробах (06.10.2026)
+
+Симптом: `vkCmdDraw` (3 вершины, 1 треугольник) не оставлял ни пикселя;
+clear (magenta) виден. **Ровно так же вёл себя stock-драйвер** (A/B) →
+проблема была не в DGC/наших патчах. Итог расследования — **и не в машине**:
+пробы вели вершины GL-привычкой (визуально **по** часовой), а система кадра
+Vulkan — y-вниз, где area треугольника по спеку
+`a = −1/2 Σ(x_i·y_{i+1} − x_{i+1}·y_i)` (минус подтверждён декодом SVG
+формы из `VkPrimitivesRasterization`) → `a < 0` → back-facing → наш же
+`CULL_BACK` в пайплайне проб **корректно** отсекал треугольник. Машина
+спецификационно-корректна — доказано probe12 (§9.1).
+
+### 9.1. Решающая цепочка (06.10.2026)
+
+1. **Формула спека**: positive area = визуально **против часовой на
+   экране**; `VK_FRONT_FACE_COUNTER_CLOCKWISE` → front = положительная area.
+2. **Старые пробы** (−1,−1) → (3,−1) → (−1,3): на экране это **по** часовой
+   → `a < 0` → back-facing → отсечение пайплайном проб. Отсюда «ни одного
+   пикселя» на обоих драйверах (и ничего общего с DGC).
+3. **probe0d + `PROBE_CULL=none`** → три полосы идеально → растеризатор,
+   VS/FS, тайлинг живы.
+4. **probe11** → верх кадра зелёный, низ magenta → ориентация вьюпорта по спеку.
+5. **probe10** → `v[3]` в SSBO заполняется → фрагментная стадия жива;
+   «FS NOT EXECUTED при cull=back» = отсечение, а не мёртвый VPC→GRAS.
+6. **probe9** → SSBO `{5a5a0000..}` → VS исполнялся всегда.
+7. **probe12** (ветер строго по спеку + дефолтный `CULL_BACK`) → полосы,
+   RC=0 → **машина конформна; дефекта нет вообще**.
+8. **A/B stock/patched**: draw-секция байт-в-байт → патчи ни при чём.
+
+Пробы исправлены (probe0d/9/10/11 — ветер по спеку), probe12 в стенде
+как эталонный контроль «машина здорова».
+
+### 9.2. Штатность остальных данных (что подтвердилось)
+
+1. **Draw-секция байт-в-байт идентична stock и patched** (264 dw:
+   bunch → SET_DRAW_STATE×2 → DRAW; stock 342 dw / patched 307 dw).
+   Разница стримов только в clear-секции (наш props-патч включает
+   `has_generic_clear` на gen2: patched = один `CP_COND_REG_EXEC`-блок,
+   stock = два cond-блока + `CP_BLIT`).
+2. **Весь стейт сверен с регистровой картой и корректен**: RT
+   (RGBA8/TILE6_2/pitch 2048/base 0x100027000), VB (stride=8),
+   VFD_FETCH_INSTR (R32G32_FLOAT), viewport/scissor/blend/initiator
+   (TRILIST/AUTO_INDEX/USE_VISIBILITY, 3 vtx, 1 inst), SP_VS_BASE /
+   SP_PS_BASE → валидный машинный код, CP_LOAD_STATE6_FRAG (immediates,
+   SB6_FS_SHADER).
+3. **Compute работает** (probe7: dispatch(1) → 0xdeadbeef в
+   host-visible buffer), CP работает (clear виден), фенс срабатывает
+   быстро (GPU не повис), fault'ов в dmesg нет.
+4. **Flag-буфер** (RB_RESOLVE_SYSTEM_FLAG_BUFFER @ 0x100026000) после
+   draw побайто идентичен baseline после чистого clear → фрагментов не
+   было **из-за отсечения** (§9.1), а не из-за DGC/CP.
+5. **Состояние сверено с эталонным трейсом работающего железа**
+   (`dEQP-VK.draw.indirect_draw...triangle_list`): расхождения только
+   поколение чипа (Z_CLAMP — бит5 A7XX) и размеры вьюпорта
+   (guardband 446 = `fd_calc_guardband(256,256)`), guardband/scissor
+   совпадают с формулами драйвера.
+
+### 9.3. Стрим и CP: доходит до конца draw_cs (декодер PM4 исправлен)
+
+Полный layout draw_cs (pm4dec3/where_state.py, после m2 — нули):
+
+```
+  0: T7 CP_MEM_WRITE  m0 (0x57480000) — контрольный маркер в начале
+  4: T7 COND_REG_EXEC (clear-блок RB_RESOLVE: magenta 0xffff00ff,
+     окно 0,0-511,255, SYSMEM 0x100027000, flag 0x100026000, op 0xf2)
+ 65: T7 CONTEXT_REG_BUNCH  65 пар (RB_MRT/VB/VFD/viewport/…)
+178: T7 CP_MEM_WRITE  m3 (после bunch#1)
+192: T7 SET_DRAW_STATE #1 (6 групп, DISABLE)
+199: T7 CP_MEM_WRITE  m4
+211: T7 CONTEXT_REG_BUNCH  6 пар
+224: T7 SET_DRAW_STATE #2 (30 групп, все S1 — состояние применяется)
+315: T7 CP_MEM_WRITE  m1 (0x57480001, перед DRAW)
+319: T7 DRAW_INDX_OFFSET  initiator=0xd84, 1/3
+323: T7 CP_MEM_WRITE  m2 (0x57480002, после DRAW)
+```
+
+Main stream (перед запуском CP): `SET_MARKER@256 payload=0x1`
+(RM6_DIRECT_RENDER, эмит-сайт `tu_cmd_buffer.cc:3378`),
+`SET_VISIBILITY_OVERRIDE@265=1`, `SET_MODE@267=0`.
+
+**CP доходит до конца draw_cs** — это доказано не маркерами, а
+отрисовкой (§9.1): пиксели есть → DRAW исполнен, значит пройдены и все
+пакеты до него (раньше вывод «не доходит» был следствием неверного ветра,
+а не остановки CP). Открытый мелкий вопрос: в раннем прогоне host-BO
+читал m1/m2 = 0 при фенсе; при отработавшем DRAW это почти наверняка
+артефакт host-чтения (кэш CPU без инвалидации), на вывод не влияет.
+
+### 9.4. Аномалии окружения (dmesg)
+
+- `msm_dpu ae01000.display-controller: bound 3d00000.gpu (ops a3xx_ops)`
+  — GPU-устройство **привязано к display-контроллеру**; `a740_sqe.fw`
+  грузит msm_dpu (после 2× -2 ENOENT «from new location»), не GPU-драйвер.
+- `gcc-sm8550`/`gpu_cc-sm8550 clock-controller: sync_state() pending due
+  to 3d6a000.gmu` (boot, ~29s); dummy regulators vdd/vddcx.
+- /sys/class/kgsl отсутствует (новый DRM-adreno), debugfs — без root.
+- GPU-fault'ов нет (ни в момент проб, ни после).
+
+### 9.5. Итог
+
+- **Причина установлена: неверный ветер треугольников в самих пробах**
+  (GL-привычка против спека Vulkan) + собственный `CULL_BACK` в пайплайне
+  проб. Исправлено в probe0d/9/10/11; probe12 — контроль «машина
+  конформна» (RC=0).
+- Дефекта машины/firmware нет (probe12, полосы беcупречны, fault'ов нет).
+- DGC и патчи ни при чём (draw-секция байт-в-байт, A/B).
+- Прежняя оценка 50/30/20 (§ старой ревизии) отменена:
+  «недосмотренное (пробы)» — 100%.
+
+### 9.6. Статус (06.10.2026, вечер)
+
+- Инстанс-обрыв 06.10 решён (сборка без `-Dplatforms`, §9.8); игра доходит до
+  D3D12 + swapchain, нативный DGC-путь vkd3d включён (лог 20261006-203753).
+- Квик «верхние строки» найден и задокументирован (§9.7) — ожидания проб
+  приведены к поведению машины, регрессия 5/5 зелёная (сборка 20:54; до неё
+  бинарники 0d/7d/9/10/11 были старше исходников с ветер-фиксом).
+- Новый симптом: краш при загрузке уровня (меню — 600 с безупречно), §9.9.
+- M2.5 — после визуальной проверки приветствия пользователем.
+
+### 9.7. Квик: верхние ~32–48 строк кадра не растеризуются (не регрессия)
+
+Наблюдение (probe0d, сборка 06.10 20:32): полноэкранный треугольник
+`{(-1,-1),(-1,3),(3,-1)}` (ветер по спеку) покрывает весь NDC-квадрат, но
+машина оставляет верхние ~32–48 строк непокрытыми: y<28 — весь ряд magenta
+(clear), y=32–48 — patchy (единичные пиксели нарисованы), y≥64 — чисто.
+
+Изоляция (`probe_dbg.c`, варианты D0–D6, argv — геометрия/FS):
+- дыра в верхних строках у **любого** треугольника, включая зеркальный D3
+  `{(-1,-3),(-1,1),(3,1)}`, у которого вообще нет кромки на y=−1;
+- D4 (клинин `{(-1,-1),(3,0),(3,-1)}` один) — свой клин не рисуется вовсе;
+  тот же клин в составе пары T1+T2 (D6, геометрия probe11) — рисуется
+  patchy;
+- probe11 прошёл, потому что его одно-точечная проверка (256,10) попала в
+  покрытый пиксель; тот же пиксель в D4/D0 не покрыт → покрытие patchy
+  per-triangle, «чистая» горизонтальная полоса-граница не существует.
+
+A/B со старым драйвером (04.10, `libvulkan_freedreno.so.bak-pre-probe` +
+временный ICD-манифест): картина **идентична до пикселя** → штатное
+поведение машины, не регрессия ни от пересборки, ни от наших патчей.
+
+Следствия:
+- probe0d/9/10 проверяют (2,1)=magenta (clear) — это и есть квик: по спеку
+  угол треугольником покрыт, но машина так не рисует (пока). Ожидание
+  `C_RED` — не менять: пробы зелёные только с `C_MAGENTA`.
+- В верхние ~48 строк новые проверки не ставить; надёжная зона — y≥64.
+- Влияние на игру: верхняя полоска кадра может терять покрытие на отдельных
+  пасах (full-screen-треугольники). Визуальная проверка — M2.5.
+
+### 9.8. Инцидент 06.10: обрыв инстанса (сборка без platforms) + гарды
+
+Симптом: запуски 19:42–20:08 падали на `vkCreateInstance`
+(`err: DxvkInstance::createInstance: Failed to create Vulkan instance`,
+логи 194237/200400/200826), при этом нативный `vulkaninfo`-createInstance и
+steam.exe-инстанс в той же сессии работали. Proton не менялся
+(`winevulkan.dll` hash = 04.10). WINEDEBUG-трейс не дошёл (PE winevulkan
+без TRACE на create-пути), `VK_LOADER_DEBUG=all` показал: третий callstack
+отсутствует → отказ до unix-загрузчика.
+
+Причина: сборка 18:06 без `-Dplatforms=x11,wayland` (`platforms = []` в
+meson-info) → в драйвере нет `VK_KHR_xcb_surface`/`VK_KHR_wayland_surface` →
+winevulkan не переводит win32-поверхность → DXVK падает за секунду до
+картинки. Это ловушка №3 `build-turnip.sh` (теперь задокументирована там).
+
+Решение и гарды:
+- пересборка каноническим `scripts/build-turnip.sh` (podman,
+  `mesa-build-fedora44-wsi-glslang`, worktree `mesa-rp6-dgc`) → `.so`
+  2026-10-06 20:32, `VK_KHR_xcb_surface/wayland/xlib` на месте,
+  driver 26.2.99;
+- `build-turnip.sh`: после cp проверка строк `VK_KHR_xcb_surface` /
+  `VK_KHR_wayland_surface` в `.so`;
+- `run-starfield.sh`: предпрогонный `vulkaninfo`-гард на `VK_KHR_xcb_surface`.
+
+pipefail-ловушка в гарде: `set -euo pipefail` + `vulkaninfo | grep -q` —
+ранний выход grep даёт vulkaninfo SIGPIPE и пайплайн ложно падает; выведено
+через herestring: `grep -q ... <<<"$(vulkaninfo 2>/dev/null)"`.
+
+Результат: прогон 20261006-203753 (600 с, RC=124) здоров — устройство
+26.2.99, 0 строк `err:`, swapchain 2560×1440 (3 изображения, ~72 с), vkd3d
+«Enabling fast paths for advanced ExecuteIndirect() graphics and compute
+(EXT_dgc)» — нативный DGC-путь включён; хвост — только
+`d3d12_device_QueryInterface E_NOINTERFACE`-спам (GUID
+`{0742a90b-c387-483f-b946-30a7e4e61458}` — интерфейс новее, чем знает
+vkd3d master; безвреден, есть в каждом прогоне).
+
+### 9.9. Краш при загрузке уровня: гипотеза M2.4-токенов
+
+Процоны 215302 и 220000 (06.10): меню — безупречно (600 с), загрузка
+уровня → device lost:
+
+| прогон | сигнатура | момент (лог = сек от boot, сверено с uptime) |
+|---|---|---|
+| 215302 | `vkEndCommandBuffer → vr −8` (VK_ERROR_FEATURE_NOT_PRESENT) → `0x887a0001` (DEVICE_HUNG), «Command list is in recording state» | 109 с после swapchain |
+| 220000 | `vkd3d_wait_for_gpu_timeline_semaphore → vr −4` (VK_ERROR_DEVICE_LOST) → `0x887a0005` (DEVICE_REMOVED) | ~45 с после старта wine |
+
+Гипотеза (высокая вероятность): уровень включает compute-indirect
+(трава/частицы) → vkd3d «graphics **and compute**» DGC-путь заводит layout'ы
+с токенами **DISPATCH** (M2.4). Механика:
+- `tu_CreateIndirectCommandsLayoutEXT` (M2.2 v1-scope) DISPATCH **принимает**
+  (`MESA_VK_DGC_DISPATCH` в `v1_dgc_info`), но `tu_dgc_build_gpu_layout`
+  считает такой токен `unsupported_tokens` (default-ветка, `tu_dgc.cc:105`)
+  и layout создаётся;
+- при `Execute` проверка M2.3-scope (`tu_cmd_buffer.cc:10625`:
+  `dgc_info & ~m23` **или** `unsupported_tokens != 0`) **ломко** шлёпает
+  `VK_ERROR_FEATURE_NOT_PRESENT` в command buffer →
+  `vkEndCommandBuffer = −8` → vkd3d `device_mark_as_removed` → краш.
+- В меню vkd3d использует только PC/SI/DRAW(_INDEXED) → Execute проходит →
+  600 с тишины.
+
+Почему сообщения драйвера в логе нет: в release-сборке (без `MESA_DEBUG`)
+`vk_errorf` гасится гейтом `vk_log.c:114` — нужен `enable_debug_logging`
+(turnip его не ставит, в отличие от ANV) или debug-колбэк приложения
+(vkd3d/wine мессенджер не создают). `MESA_VK_LOG` — build-time (`-Ddebug`),
+не env. Существующая диагностика в коде: **`DGC_DUMP=1`** — дамп токенов
+layout'а в stderr при создании (`tu_dgc.cc:73,100`; default-ветка DISPATCH
+печатать не умеет — дособрать при необходимости).
+
+A/B (не выполнен, следующий шаг):
+```sh
+# без DGC вообще — краш должен уйти, если гипотеза верна:
+VKD3D_DISABLE_EXTENSIONS=VK_EXT_device_generated_commands \
+    scripts/run-starfield.sh patched 600
+# дамп токенов, которые vkd3d заводит:
+DGC_DUMP=1 scripts/run-starfield.sh patched 600
+```
+(пасsthrough добавлен в `run-starfield.sh`, §9.8-гарды не затрагиваются).
+
+Если подтвердится — два пути:
+(a) честная `GetIndirectCommandsLayoutTokenSupport`/scope: layout'ы с
+    DISPATCH не принимать на Create (громко), чтобы vkd3d чисто фолбэйчил на
+    обычный indirect для compute (DGC остался бы для graphics);
+(b) реализовать M2.4 (DISPATCH = `CP_EXEC_CS` + count-варианты).
+
+

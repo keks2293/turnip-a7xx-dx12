@@ -1,0 +1,787 @@
+# date: 2026-10-06T20:08:26+08:00
+# mode: patched
+# VK_DRIVER_FILES=/var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+# vkd3d-proton: master-сборка f1baafac44a21600 (native-override)
+# devices (name | sparseResidencyImage2D):
+#   Turnip Adreno (TM) 740  | true
+# ---
+ProtonFixes[22044] INFO: Running protonfixes on "cachyos-11.0-20260703-slr", build at 2026-07-21 23:36:49+00:00.
+ProtonFixes[22044] INFO: Running checks
+ProtonFixes[22044] INFO: All checks successful
+ProtonFixes[22044] INFO: Using early stage global defaults for UNKNOWN (1716740)
+ProtonFixes[22044] INFO: Using early stage global protonfix for UNKNOWN (1716740)
+[Vulkan Loader] INFO:           Vulkan Loader Version 1.4.341
+[Vulkan Loader] INFO:           No valid vk_loader_settings.json file found, no loader settings will be active
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] LAYER:          Searching for explicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:             Found no files
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] DEBUG | LAYER:  Loading layer library libVkLayer_MESA_device_select.so
+[Vulkan Loader] INFO | LAYER:   Insert instance layer "VK_LAYER_MESA_device_select" (/usr/lib64/libVkLayer_MESA_device_select.so)
+[Vulkan Loader] LAYER:          vkCreateInstance layer callstack setup to:
+[Vulkan Loader] LAYER:             <Application>
+[Vulkan Loader] LAYER:               ||
+[Vulkan Loader] LAYER:             <Loader>
+[Vulkan Loader] LAYER:               ||
+[Vulkan Loader] LAYER:             VK_LAYER_MESA_device_select
+[Vulkan Loader] LAYER:                     Type: Implicit
+[Vulkan Loader] LAYER:                     Enabled By: Implicit Layer
+[Vulkan Loader] LAYER:                         Disable Env Var:  NODEVICE_SELECT
+[Vulkan Loader] LAYER:                     Manifest: /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] LAYER:                     Library:  /usr/lib64/libVkLayer_MESA_device_select.so
+[Vulkan Loader] LAYER:               ||
+[Vulkan Loader] LAYER:             <Drivers>
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740  
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] DEBUG | LAYER:  Unloading layer library /usr/lib64/libVkLayer_MESA_device_select.so
+ProtonFixes[22044] INFO: Setting up FSR4 version default.
+ProtonFixes[22044] INFO: Automatic FSR4 upgrade enabled.
+ProtonFixes[22044] INFO: Running protonfixes on "cachyos-11.0-20260703-slr", build at 2026-07-21 23:36:49+00:00.
+ProtonFixes[22044] INFO: Running checks
+ProtonFixes[22044] INFO: All checks successful
+ProtonFixes[22044] INFO: Using main stage global defaults for UNKNOWN (1716740)
+ProtonFixes[22044] INFO: Using main stage global protonfix for UNKNOWN (1716740)
+ntsync: up and running.
+[Vulkan Loader] INFO:           Vulkan Loader Version 1.4.341
+[Vulkan Loader] INFO:           No valid vk_loader_settings.json file found, no loader settings will be active
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] INFO:           No valid vk_loader_settings.json file found, no loader settings will be active
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] INFO:           No valid vk_loader_settings.json file found, no loader settings will be active
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] LAYER:          Searching for explicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:             Found no files
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] DEBUG | LAYER:  Loading layer library libVkLayer_MESA_device_select.so
+[Vulkan Loader] INFO | LAYER:   Insert instance layer "VK_LAYER_MESA_device_select" (/usr/lib64/libVkLayer_MESA_device_select.so)
+[Vulkan Loader] LAYER:          vkCreateInstance layer callstack setup to:
+[Vulkan Loader] LAYER:             <Application>
+[Vulkan Loader] LAYER:               ||
+[Vulkan Loader] LAYER:             <Loader>
+[Vulkan Loader] LAYER:               ||
+[Vulkan Loader] LAYER:             VK_LAYER_MESA_device_select
+[Vulkan Loader] LAYER:                     Type: Implicit
+[Vulkan Loader] LAYER:                     Enabled By: Implicit Layer
+[Vulkan Loader] LAYER:                         Disable Env Var:  NODEVICE_SELECT
+[Vulkan Loader] LAYER:                     Manifest: /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] LAYER:                     Library:  /usr/lib64/libVkLayer_MESA_device_select.so
+[Vulkan Loader] LAYER:               ||
+[Vulkan Loader] LAYER:             <Drivers>
+ATTENTION: default value of option tu_override_uncached_as_cache_coherent overridden by environment.
+[Vulkan Loader] DEBUG:          loader_gpa_instance_terminator() unrecognized name vkCreateMacOSSurfaceMVK
+[Vulkan Loader] DEBUG:          loader_gpa_instance_terminator() unrecognized name vkCreateMetalSurfaceEXT
+[Vulkan Loader] DEBUG:          loader_gpa_instance_terminator() unrecognized name vkCreateWin32SurfaceKHR
+[Vulkan Loader] DEBUG:          loader_gpa_instance_terminator() unrecognized name vkGetPhysicalDeviceWin32PresentationSupportKHR
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740  
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] Turnip Adreno (TM) 740  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+warn:  CreateDXGIFactory2: Ignoring flags
+info:  Game: Starfield.exe
+info:  DXVK: v3.0.2-2-g0ff9cd328ca23b4
+info:  Build: aarch64 clang 22.1.8
+info:  Vulkan: Found vkGetInstanceProcAddr in winevulkan.dll @ 0x6ffff57e0cc0
+info:  Extension providers:
+info:    Platform WSI
+info:    OpenVR
+info:  OpenVR: could not open registry key, status 2
+warn:  OpenVR: Failed to initialize OpenVR
+info:    OpenXR
+[Vulkan Loader] INFO:           Vulkan Loader Version 1.4.341
+warn:  OpenXR: Unable to get required Vulkan instance extensions size
+[Vulkan Loader] INFO:           No valid vk_loader_settings.json file found, no loader settings will be active
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] INFO:           No valid vk_loader_settings.json file found, no loader settings will be active
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] INFO:           No valid vk_loader_settings.json file found, no loader settings will be active
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] INFO:           No valid vk_loader_settings.json file found, no loader settings will be active
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] INFO:           No valid vk_loader_settings.json file found, no loader settings will be active
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] INFO:           No valid vk_loader_settings.json file found, no loader settings will be active
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /var/home/armada/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.config/kdedefaults/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/kde-settings/kde-profile/default/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found the following files:
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json
+[Vulkan Loader] LAYER:                /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json
+[Vulkan Loader] LAYER:                /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamoverlay_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_i386.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_x86_64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /var/home/armada/.local/share/vulkan/implicit_layer.d/steamfossilize_arm64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/MangoHud.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_FROG_gamescope_wsi.aarch64.json (file version 1.0.0)
+[Vulkan Loader] INFO:           Found manifest file /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json (file version 1.0.0)
+info:  Enabled instance extensions:
+info:    VK_KHR_get_surface_capabilities2
+info:    VK_KHR_surface
+info:    VK_KHR_surface_maintenance1
+info:    VK_KHR_win32_surface
+err:   DxvkInstance::createInstance: Failed to create Vulkan instance
+err:   Failed to initialize DXVK.
+Traceback (most recent call last):
+  File "/usr/share/steam/compatibilitytools.d/proton-cachyos-11.0-arm64/proton", line 2457, in <module>
+    rc = g_session.run()
+  File "/usr/share/steam/compatibilitytools.d/proton-cachyos-11.0-arm64/proton", line 2397, in run
+    rc = self.run_proc(adverb + argv + sys.argv[2:] + self.cmdlineappend)
+  File "/usr/share/steam/compatibilitytools.d/proton-cachyos-11.0-arm64/proton", line 2346, in run_proc
+    return subprocess.call(args, env=local_env, stderr=self.log_file, stdout=self.log_file)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 398, in call
+    return p.wait(timeout=timeout)
+           ~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 1279, in wait
+    return self._wait(timeout=timeout)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 2084, in _wait
+    (pid, sts) = self._try_wait(0)
+                 ~~~~~~~~~~~~~~^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 2042, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+                 ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

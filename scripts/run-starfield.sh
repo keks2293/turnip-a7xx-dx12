@@ -43,6 +43,18 @@ esac
 [ -f "$GAME_EXE" ] || { echo "нет игры: $GAME_EXE" >&2; exit 1; }
 mkdir -p "$PREFIX"   # proton кладёт pfx.lock только если каталог уже есть
 
+# Ловушка build-turnip.sh №3: сборка без -Dplatforms=x11,wayland даёт драйвер
+# без VK_KHR_xcb_surface — wine не переводит win32-поверхность, и DXVK падает
+# на vkCreateInstance за секунду до картинки (лог: "Failed to create Vulkan
+# instance"). Ловим сразу, а не таймаутом в 600 с.
+# Вывод копим целиком: под set -o pipefail ранний выход grep -q рвёт трубу,
+# vulkaninfo ловит SIGPIPE, и пайплайн падает ложно.
+if ! grep -q 'VK_KHR_xcb_surface' <<<"$(vulkaninfo 2>/dev/null)"; then
+    echo "нет VK_KHR_xcb_surface: драйвер собран без -Dplatforms=x11,wayland" >&2
+    echo "(см. build-turnip.sh, ловушка №3; пересборка scripts/build-turnip.sh)" >&2
+    exit 1
+fi
+
 # vkd3d-proton: в proton-cachyos старая версия без фикса «fp16 on Turnip» —
 # Turnip честно не умеет shaderDenormPreserveFloat16 (гейт A8XX), vkd3d из-за
 # этого отказывает в fp16-шейдере Starfield (compute PSO → hr 0x80070057) и
@@ -68,8 +80,18 @@ export STEAM_COMPAT_DATA_PATH="$PREFIX"
 export STEAM_COMPAT_CLIENT_INSTALL_PATH="/var/home/armada/.local/share/Steam"
 export STEAM_COMPAT_APP_ID=1716740   # Starfield; нужен protonfixes для фиксов
 export PROTON_LOG=1
-export WINEDEBUG=-all
+export WINEDEBUG="${WINEDEBUG:--all}"   # для диагностики: WINEDEBUG=+vulkan ./scripts/...
 export VK_LOADER_DEBUG="${VK_LOADER_DEBUG:-error,warn}"
+
+# Диагностические пасsthrough (dgc-plan §9.9):
+#   VKD3D_DISABLE_EXTENSIONS=VK_EXT_device_generated_commands — A/B без DGC
+#   (vkd3d device.c:202, список через запятую)
+#   DGC_DUMP=1 — дамп DGC-токенов layout'а в stderr (tu_dgc.cc)
+#   MESA_DEBUG=1 — mesa_log-вывод драйвера (в release-сборке vk_errorf
+#   дополнительно требует debug-колбэк — см. dgc-plan §9.9)
+for name in VKD3D_DISABLE_EXTENSIONS MESA_DEBUG DGC_DUMP; do
+    if [ -n "${!name:-}" ]; then export "$name"; fi
+done
 
 {
   echo "# date: $(date -Is)"

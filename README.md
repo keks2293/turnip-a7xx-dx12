@@ -275,6 +275,31 @@ $REPO/scripts/run-test.sh "$RP6_TURNIP_ICD" $REPO/results/test-patched.log
 Готовые логи лежат в `results/`; если теста нет — сборка не прогонялась,
 см. `build-test.sh`.
 
+### DGC-пробы (`tests/dgc-probe`)
+
+Vulkan-пробы DGC-стенда без vkd3d (`docs/dgc-plan.md` §9): `probe0d/7d/9/10/11/12`
+— регрессия (RC: 0 ok, 3 mismatch; в tmux-логах RC не видно — смотреть
+строки OK/FAIL), `probe12` — эталон «машина конформна» (ветер строго по
+спеку + дефолтный `CULL_BACK`), `probe_dbg.c` — диагностический (варианты
+треугольников, в PROBES не входит, собирается впритык).
+
+`make` на устройстве нет — сборка в контейнере, прогон на хосте (игра
+должна быть закрыта):
+
+```sh
+cd tests/dgc-probe
+# всё или одна (make probe0d):
+podman run --rm -v "$PWD":/src:Z -v /usr/lib64/libvulkan.so.1:/opt/vk/libvulkan.so.1:Z \
+    localhost/mesa-build-fedora44-full make -C /src all POD_BUILD= POD_GLSLANG=
+# прогон (драйвер из build/out через VK_DRIVER_FILES):
+VK_DRIVER_FILES=/var/home/armada/opencode/build/out/freedreno_icd.json ./probe0d
+```
+
+Квик «верхние строки» (dgc-plan §9.7): машина НЕ растеризует верхние
+~32–48 строк кадра (patchy; A/B 04.10/06.10 идентичны — штатное, не
+регрессия). Поэтому пробы проверяют угол (2,1) как `C_MAGENTA` (clear), а
+не `C_RED`, и новые проверки в верхние ~48 строк не ставить.
+
 ### Проверка без железа
 
 Модель гейта считает раскладку всех 72 классов vkd3d прямо по исходникам:

@@ -1,0 +1,5 @@
+#version 450
+/* probe7: контроль SQE — compute пишет константу в host-visible буфер. */
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 0) buffer B { uint v[]; };
+void main() { v[gl_GlobalInvocationID.x] = 0xdeadbeefu; }

@@ -70,6 +70,16 @@ fi
 mkdir -p /out/out
 cp -v "$SO" /out/out/
 
+# Ловушка №3 (см. шапку): без -Dplatforms=x11,wayland в бинарнике нет строк
+# WSI-расширений, wine не переводит win32-поверхность игры, и DXVK падает на
+# vkCreateInstance ("Failed to create Vulkan instance") — игра висит без
+# картинки до таймаута. Проверяем строку, как драирф-путь ниже.
+if ! grep -aq 'VK_KHR_xcb_surface' "$SO" || ! grep -aq 'VK_KHR_wayland_surface' "$SO"; then
+    echo "ВНИМАНИЕ: в драйвере нет VK_KHR_xcb_surface/VK_KHR_wayland_surface —" >&2
+    echo "сборка сделана не через build-turnip.sh или без -Dplatforms=x11,wayland" >&2
+    exit 1
+fi
+
 # Манифест ICD пишется здесь, а не берётся из сборки: сгенерированный мезоном
 # json содержит library_path install-пути (/out/usr/lib/...), который на
 # устройстве не существует. Нужен путь, который загрузчик увидит на устройстве.
