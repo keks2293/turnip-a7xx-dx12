@@ -110,10 +110,21 @@ Containerfile в `container/`). От `-Dplatforms=` в `scripts/build-turnip.sh`
 окно с текстом «your GPU was not supported». Это отказ самой
 игры, а не proton: лог чист, ни одного `err:` и ни одного `Exception`, а игра
 доходит до `d3d12_device_CheckFeatureSupport` и поднимает кеш шейдеров — то
-есть 12_0-путь работает, ломается проверка возможностей. Наиболее вероятно,
-что срабатывает заложенный в 0004 отказ на create для связки sparse + MUTABLE
-без списка форматов: на 11_1 игра этот путь не трогает, на 12_0 — трогает.
-Проверяется экспериментом `experiments/0003-experiment-no-sparse-create-refusal.patch`.
+есть 12_0-путь работает, ломается проверка возможностей.
+
+**Причина отказа найдена — это не гейт патчей.** Игра требует SM 6.6, а его
+даёт условие 6.2 в vkd3d: `shaderDenormPreserveFloat32`, которое Turnip берёт
+из driconf-опции `tu_enable_softfloat32`, включаемой в
+`00-turnip-defaults.conf` **только для движка `vkd3d`**. Наша сборка Mesa
+настроена с `prefix=/out/usr`, поэтому драйвер искал driconf в
+`/out/usr/share/drirc.d` — такого каталога нет, и ни одной опции turnip не
+прочиталось. `vulkaninfo` этого не показывал: имя его движка не `vkd3d`,
+поэтому оба драйвера сообщают `Preserve32 = false`.
+
+Проверено: `VKD3D_SHADER_MODEL=6_6` на патченом драйвере — игра идёт
+(`results/game-patched-sm66.log`); тот же драйвер с `DRIRC_CONFIGDIR`,
+поднявшим `tu_enable_softfloat32`, отдаёт `shaderDenormPreserveFloat32 = true`.
+Разбор — раздел 10 дока.
 
 Ещё не проверено: реакция vkd3d на `VK_ERROR_FEATURE_NOT_PRESENT` при
 mutable+sparse без format list — три пробы (E, F, B), которые на стоке
