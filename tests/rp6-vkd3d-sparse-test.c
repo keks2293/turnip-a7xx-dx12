@@ -806,6 +806,547 @@ static void probe_linear_sparse(VkDevice dev, VkQueue q, VkCommandPool pool, VkI
                tag, n37, nz, noth);
 }
 
+/* U. Does a vkd3d TYPELESS class keep its UBWC, and do the bytes survive?
+ *
+ * Stock keeps every _FLOAT out of fd6_ubwc_compat_mode() (for R32_FLOAT it
+ * even says "a630 blob allows these, but not a660"), so any class mixing
+ * SFLOAT with the integer family fails tu6_mutable_format_list_ubwc_compatible()
+ * and loses compression.  These five classes are exactly what vkd3d builds
+ * for D3D12 TYPELESS resources, so unlike the BGR pairs the consumer is real.
+ *
+ * Two independent questions, two independent measurements:
+ *
+ *  - did the list keep UBWC?  memreq only, against two controls from the
+ *    same base format: LINEAR tiling (size floor) and the same format
+ *    non-mutable (what it can do unaided).  list > nonmutable isolates the
+ *    list's own effect, so a format with no UBWC mode at all is not
+ *    mistaken for a format the list broke;
+ *
+ *  - is the cast byte-exact?  transfers only - fill known bytes with
+ *    CopyBufferToImage (that is what compresses on store), read back with
+ *    CopyImageToBuffer, compare.  No texture unit involved, so the verdict
+ *    does not depend on the swap modelling that made the earlier
+ *    INT-sampler probes ambiguous.  The non-mutable image is run through the
+ *    same path as a control, so "this format cannot round-trip at all" is
+ *    separable from "the format list broke the round-trip".
+ */
+/* Проба V: список, который vkd3d строит для typeless-BGRA8 под UAV
+ * ({B8G8R8A8_UNORM, B8G8R8A8_SRGB, R32_UINT, R32_SINT, R32_SFLOAT} —
+ * resource.c:393-401, правило D3D11 про typed UAV loads).
+ *
+ * На стоке он уходит в linear, потому что B8G8R8A8 несёт WXYZ, а R32 — WZYX,
+ * и tu6_format_list_swaps_are_uniform() считает это не-uniform. Эксперимент
+ * 0009 оставляет такой список на тайлинге, и тогда надо знать, что видит
+ * второй вид. Эксперимент 0010 добавляет к этому is_mutable (MUTABLEEN) без
+ * UBWC — открытая комбинация из §14.
+ *
+ * Копии в Vulkan берут формат образа, а не вида, поэтому мерить вид можно
+ * только шейдером: fill через CopyBufferToImage (формат образа = BGRA8),
+ * чтение compute-шейдером cast_r32_glsl (usampler2D + R32_UINT-вид), который
+ * отдаёт сырое 32-битное слово. Вид в формате B8G8R8A8_UNORM через
+ * usampler2D читать нельзя (шейдер ждёт целочисленный формат): проба дала
+ * одинаковый мусор в обоих режимах, то есть не измеряет ничего. Сторону BGRA8
+ * (fill и readback форматом образа) закрывает проба U, класс B8G8R8A8_UAVLIST.
+ *
+ * Ожидание по коду:
+ *   linear : запись идёт форматом образа, R32-вид читает сырое -> как записано;
+ *   tiled  : fd6_pipe2swap() даёт WZYX всем видам (fd6_format_table.c:396), и
+ *            при переводе linear->tile слово перекладывается в порядке тайла,
+ *            поэтому R32-вид читает уже другое слово;
+ *   tiled + MUTABLEEN (эксперимент 0010): вид BGRA8 возвращает форматовый
+ *            WXYZ, то есть R32-вид должен совпасть с linear — если канал
+ *            перестановки в драйвере работает.
+ * Все три варианта меряются одним бинарём: контрольный образ с
+ * VK_IMAGE_TILING_LINEAR всегда создаётся с тем же списком.
+ */
+static void probe_mixed_swap_uav(VkDevice dev, VkQueue q, VkCommandPool pool, const char *tag)
+{
+    static const VkFormat list[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_SRGB,
+                                     VK_FORMAT_R32_UINT,       VK_FORMAT_R32_SINT,
+                                     VK_FORMAT_R32_SFLOAT };
+    const unsigned nlist = ARRAY_SIZE(list);
+    const VkExtent3D gran = { W, H, 1 };
+    VkImageView views[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+
+    /* два образа с ОДНИМ И ТЕМ ЖЕ списком: t=0 LINEAR (контроль),
+     * t=1 OPTIMAL (то, что решит драйвер) */
+    VkImage img[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+    VkDeviceMemory img_mem[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+    VkMemoryRequirements ireq[2];
+    for (int t = 0; t < 2; t++) {
+        VkImageFormatListCreateInfo ifl = { VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO, NULL,
+                                            nlist, list };
+        VkImageCreateInfo ici = { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                                  .imageType = VK_IMAGE_TYPE_2D,
+                                  .format = VK_FORMAT_B8G8R8A8_UNORM,
+                                  .extent = { W, H, 1 },
+                                  .mipLevels = 1,
+                                  .arrayLayers = 1,
+                                  .samples = VK_SAMPLE_COUNT_1_BIT,
+                                  .tiling = t == 0 ? VK_IMAGE_TILING_LINEAR : VK_IMAGE_TILING_OPTIMAL,
+                                  .usage = VK_IMAGE_USAGE_SAMPLED_BIT |
+                                           VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                           VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                  .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                                  .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                                  .flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
+                                  .pNext = &ifl };
+        VkResult rr = vkCreateImage(dev, &ici, NULL, &img[t]);
+        if (rr != VK_SUCCESS) {
+            printf("\nV[%s] create[%d] %s\n", tag, t, vkerr(rr));
+            goto cleanup;
+        }
+        vkGetImageMemoryRequirements(dev, img[t], &ireq[t]);
+        if (alloc_mem(dev, ireq[t].size, 0, &img_mem[t]) != VK_SUCCESS) {
+            printf("\nV[%s] alloc[%d] failed\n", tag, t);
+            goto cleanup;
+        }
+        chk(vkBindImageMemory(dev, img[t], img_mem[t], 0), "V: bind image");
+    }
+    /* Детектор «тайлинг или linear», два независимых способа.
+     *
+     * 1) Размер. При 4 байт на тексель тайл 64x64, и 512x512 разбивается ровно
+     *    (8x8), поэтому у 512x512 tiled и linear дают одинаковый memreq — не
+     *    годится. Взять 500x500: linear займёт 500*500*4 = 0xf4240, tiled
+     *    дополнит до 512x512 = 0x100000. Решение о тайлинге от размера не
+     *    зависит, поэтому образ 500x500 ставит тот же флаг, что и 512x512.
+     * 2) sparse-residency. tu_image.cc отдаёт FEATURE_NOT_PRESENT, если флаг
+     *    задан, а tile_mode != TILE6_3. Образ для этого создаётся с
+     *    TILING_OPTIMAL — ровно как рабочий: с TILING_LINEAR результат говорил
+     *    бы о модификаторе, а не о списке форматов. */
+    const unsigned DW = 500, DH = 500;   /* не кратно 64 */
+    VkDeviceSize det_lin = 0, det_opt = 0;
+    VkResult sparse_rr = VK_ERROR_INITIALIZATION_FAILED;
+    /* три образа: 0 = LINEAR (эталон размера), 1 = OPTIMAL (вердикт по размеру),
+     * 2 = OPTIMAL + SPARSE (вердикт по sparse) */
+    for (int t = 0; t < 3; t++) {
+        VkImageFormatListCreateInfo ifl = { VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO, NULL,
+                                            nlist, list };
+        VkImageCreateInfo sci = { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                                  .imageType = VK_IMAGE_TYPE_2D,
+                                  .format = VK_FORMAT_B8G8R8A8_UNORM,
+                                  .extent = { DW, DH, 1 },
+                                  .mipLevels = 1,
+                                  .arrayLayers = 1,
+                                  .samples = VK_SAMPLE_COUNT_1_BIT,
+                                  .tiling = t == 0 ? VK_IMAGE_TILING_LINEAR
+                                                   : VK_IMAGE_TILING_OPTIMAL,
+                                  .usage = VK_IMAGE_USAGE_SAMPLED_BIT |
+                                           VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                           VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                  .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                                  .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                                  .flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT |
+                                           (t == 2 ? VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT : 0),
+                                  .pNext = &ifl };
+        VkImage d_img = VK_NULL_HANDLE;
+        VkResult r = vkCreateImage(dev, &sci, NULL, &d_img);
+        if (t == 2) {
+            sparse_rr = r;
+        } else if (r == VK_SUCCESS) {
+            VkMemoryRequirements dr;
+            vkGetImageMemoryRequirements(dev, d_img, &dr);
+            if (t == 0) det_lin = dr.size; else det_opt = dr.size;
+        }
+        if (d_img != VK_NULL_HANDLE) vkDestroyImage(dev, d_img, NULL);
+    }
+    printf("\nV[%s] %dx%d bpt=4  memreq: linear=0x%llx optimal=0x%llx (при 64x64-тайле"
+           " 512x512 делится ровно, размер НЕ различает)\n", tag, W, H,
+           (unsigned long long)ireq[0].size, (unsigned long long)ireq[1].size);
+    printf("V[%s] детектор-размер  %ux%u: linear=0x%llx (500*500*4=0xf4240)"
+           " optimal=0x%llx => %s\n", tag, DW, DH, (unsigned long long)det_lin,
+           (unsigned long long)det_opt,
+           det_opt > det_lin ? "OPTIMAL ТАЙЛИНГ (дополнено до 512x512)"
+                             : "OPTIMAL = linear (тайлинг снят драйвером)");
+    printf("V[%s] детектор-sparse  тот же список + SPARSE_RESIDENCY -> %s  => %s\n", tag,
+           vkerr(sparse_rr),
+           sparse_rr == VK_SUCCESS ? "тайлинг допускается"
+                                   : "linear (линейный образ с sparse запрещён)");
+
+    VkDescriptorSetLayoutBinding dsb[2] = {
+        { 0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL },
+        { 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL },
+    };
+    VkDescriptorSetLayoutCreateInfo dslci = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+                                              NULL, 0, 2, dsb };
+    VkDescriptorSetLayout dsl = VK_NULL_HANDLE;
+    chk(vkCreateDescriptorSetLayout(dev, &dslci, NULL, &dsl), "V: create dsl");
+    VkPipelineLayoutCreateInfo plci = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, NULL, 0, 1,
+                                        &dsl, 0, NULL };
+    VkPipelineLayout pl = VK_NULL_HANDLE;
+    chk(vkCreatePipelineLayout(dev, &plci, NULL, &pl), "V: create pipeline layout");
+    VkSamplerCreateInfo sci = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                               .magFilter = VK_FILTER_NEAREST,
+                               .minFilter = VK_FILTER_NEAREST,
+                               .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+                               .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                               .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                               .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                               .anisotropyEnable = VK_FALSE,
+                               .compareEnable = VK_FALSE,
+                               .unnormalizedCoordinates = VK_FALSE };
+    VkSampler sam = VK_NULL_HANDLE;
+    chk(vkCreateSampler(dev, &sci, NULL, &sam), "V: create sampler");
+
+    VkPipeline pipe_r32 = make_compute_pipe(dev, pl, cast_r32_spv, (uint32_t)sizeof(cast_r32_spv));
+    chk(pipe_r32 ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED, "V: create cast pipeline");
+
+    VkBufferCreateInfo rbci = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, NULL, 0,
+                                (VkDeviceSize)W * H * 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                VK_SHARING_MODE_EXCLUSIVE, 0, NULL };
+    VkBuffer rb = VK_NULL_HANDLE;
+    VkDeviceMemory rbm = VK_NULL_HANDLE;
+    chk(vkCreateBuffer(dev, &rbci, NULL, &rb), "V: create ssbo");
+    VkMemoryRequirements rbr;
+    vkGetBufferMemoryRequirements(dev, rb, &rbr);
+    chk(alloc_mem(dev, rbr.size, 0, &rbm), "V: alloc ssbo");
+    chk(vkBindBufferMemory(dev, rb, rbm, 0), "V: bind ssbo");
+
+    /* ОДИН набор дескрипторов на оба образа: перед каждым перезаписываем
+     * биндинг 0 на R32_UINT-вид нужного образа. Пул — ровно как в пробе D
+     * (4+4, maxSets=2): четыре набора из одного пула у этого драйвера
+     * возвращали OUT_OF_POOL_MEMORY независимо от размеров пула. */
+    VkDescriptorPoolSize dpsz[2] = { { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4 },
+                                     { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4 } };
+    VkDescriptorPoolCreateInfo dpci = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, NULL, 0, 2, 2,
+                                        dpsz };
+    VkDescriptorPool dp = VK_NULL_HANDLE;
+    chk(vkCreateDescriptorPool(dev, &dpci, NULL, &dp), "V: create dpool");
+    VkDescriptorSetAllocateInfo dsai = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, NULL, dp, 1,
+                                         &dsl };
+    VkDescriptorSet dset = VK_NULL_HANDLE;
+    chk(vkAllocateDescriptorSets(dev, &dsai, &dset), "V: alloc dset");
+
+    /* Только R32_UINT-вид. Вид в формате B8G8R8A8_UNORM через usampler2D —
+     * невалидное использование (шейдер ждёт целочисленный формат), и оно
+     * даёт одинаковый мусор в обоих режимах, то есть ничего не измеряет.
+     * Сторону BGRA8 (fill и readback форматом образа) закрывает проба U,
+     * класс B8G8R8A8_UAVLIST. */
+    for (int t = 0; t < 2; t++) {
+        VkImageViewCreateInfo vci = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, NULL, 0,
+                                      img[t], VK_IMAGE_VIEW_TYPE_2D, VK_FORMAT_R32_UINT,
+                                      (VkComponentMapping){ VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                           VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                           VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                           VK_COMPONENT_SWIZZLE_IDENTITY },
+                                      (VkImageSubresourceRange){ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1,
+                                                               0, 1 } };
+        chk(vkCreateImageView(dev, &vci, NULL, &views[t]), "V: create R32 view");
+    }
+    /* биндинг 1 (SSBO) один и тот же для обоих образов, пишем его один раз */
+    {
+        VkDescriptorBufferInfo bfi1 = { rb, 0, VK_WHOLE_SIZE };
+        VkWriteDescriptorSet w1 = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                    .dstSet = dset, .dstBinding = 1, .descriptorCount = 1,
+                                    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                    .pBufferInfo = &bfi1 };
+        vkUpdateDescriptorSets(dev, 1, &w1, 0, NULL);
+    }
+
+    uint32_t *pat = malloc((size_t)W * H * 4);
+    uint32_t *rbw[2];
+    if (!pat || !(rbw[0] = malloc((size_t)W * H * 4)) || !(rbw[1] = malloc((size_t)W * H * 4))) {
+        printf("V[%s] OOM\n", tag);
+        free(pat);
+        free(rbw[0]);
+        free(rbw[1]);
+        goto cleanup;
+    }
+    for (size_t i = 0; i < (size_t)W * H; i++)
+        pat[i] = 0x11223344u + (uint32_t)i;   /* байты различимы и зависят от индекса */
+
+    for (int t = 0; t < 2; t++) {
+        /* два прохода: первый fill холодный и теряет ~2% текселей
+         * (tests/repro-first-fill.c), результат читаем из второго */
+        for (int pass = 0; pass < 2; pass++) {
+            VkDescriptorImageInfo dii = { sam, views[t],
+                                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+            VkWriteDescriptorSet w0 = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                        .dstSet = dset, .dstBinding = 0, .descriptorCount = 1,
+                                        .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                        .pImageInfo = &dii };
+            vkUpdateDescriptorSets(dev, 1, &w0, 0, NULL);
+            if (cast_roundtrip(dev, q, pool, img[t], VK_IMAGE_LAYOUT_UNDEFINED,
+                               VK_ACCESS_MEMORY_WRITE_BIT, gran, pat, pipe_r32, dset, rbm,
+                               rbw[t]) != 0) {
+                printf("V[%s] cast_roundtrip[%d] не отработал\n", tag, t);
+                goto cleanup;
+            }
+        }
+    }
+
+    /* ---- вердикт ---- */
+    {
+        static const char *tname[2] = { "linear (контроль)", "optimal (решение)" };
+        const size_t total = (size_t)W * H;
+        for (int t = 0; t < 2; t++) {
+            size_t r_same = 0, r_swap = 0, r_other = 0;
+            for (size_t i = 0; i < total; i++) {
+                if (rbw[t][i] == pat[i]) r_same++;
+                else if (rbw[t][i] == __builtin_bswap32(pat[i])) r_swap++;
+                else r_other++;
+            }
+            printf("V[%s] %-20s R32-вид: как записано=%zu  с перевёрнутыми байтами=%zu"
+                   "  иное=%zu\n", tag, tname[t], r_same, r_swap, r_other);
+        }
+        size_t diff = 0, first = (size_t)-1, last = 0;
+        for (size_t i = 0; i < total; i++)
+            if (rbw[0][i] != rbw[1][i]) { diff++; if (first == (size_t)-1) first = i; last = i; }
+        printf("V[%s] тексели: (0,0) записано %08x | linear %08x  optimal %08x\n", tag, pat[0],
+               rbw[0][0], rbw[1][0]);
+        printf("V[%s]         (y=256,x=256) записано %08x | linear %08x  optimal %08x\n", tag,
+               pat[(size_t)W * 256 + 256], rbw[0][(size_t)W * 256 + 256],
+               rbw[1][(size_t)W * 256 + 256]);
+        if (diff == 0)
+            printf("V[%s] ВЕРДИКТ: R32-вид в linear и в optimal совпали во всех %zu словах"
+                   " -> видимость через второй вид НЕ изменилась\n", tag, total);
+        else
+            printf("V[%s] ВЕРДИКТ: R32-вид РАЗОШЁЛСЯ в %zu/%zu словах (первое (y=%zu x=%zu),"
+                   " последнее (y=%zu x=%zu)) -> видимость через второй вид ИЗМЕНИЛАСЬ\n", tag,
+                   diff, total, (size_t)(first / W), (size_t)(first % W), (size_t)(last / W),
+                   (size_t)(last % W));
+        free(pat);
+        free(rbw[0]);
+        free(rbw[1]);
+    }
+
+cleanup:
+    for (int t = 0; t < 2; t++) {
+        if (img[t] != VK_NULL_HANDLE) vkDestroyImage(dev, img[t], NULL);
+        if (img_mem[t] != VK_NULL_HANDLE) vkFreeMemory(dev, img_mem[t], NULL);
+    }
+    for (int i = 0; i < 2; i++)
+        if (views[i] != VK_NULL_HANDLE) vkDestroyImageView(dev, views[i], NULL);
+    if (rb != VK_NULL_HANDLE) vkDestroyBuffer(dev, rb, NULL);
+    if (rbm != VK_NULL_HANDLE) vkFreeMemory(dev, rbm, NULL);
+    if (dp != VK_NULL_HANDLE) vkDestroyDescriptorPool(dev, dp, NULL);
+    if (dsl != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(dev, dsl, NULL);
+    if (pl != VK_NULL_HANDLE) vkDestroyPipelineLayout(dev, pl, NULL);
+    if (sam != VK_NULL_HANDLE) vkDestroySampler(dev, sam, NULL);
+}
+
+static void probe_ubwc_class(VkDevice dev, VkQueue q, VkCommandPool pool, const char *tag,
+                             VkFormat base, const VkFormat *list, unsigned n, unsigned bpt)
+{
+    VkDeviceSize bytes = (VkDeviceSize)W * H * bpt;
+
+    /* designated initializers: vulkan-headers 1.4.341 added VkImageType to
+     * VkImageCreateInfo, and a positional list would silently shift */
+    VkImageCreateInfo ici = { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                              .imageType = VK_IMAGE_TYPE_2D,
+                              .format = base,
+                              .extent = { W, H, 1 },
+                              .mipLevels = 1,
+                              .arrayLayers = 1,
+                              .samples = VK_SAMPLE_COUNT_1_BIT,
+                              .tiling = VK_IMAGE_TILING_OPTIMAL,
+                              .usage = VK_IMAGE_USAGE_SAMPLED_BIT |
+                                       VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                       VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                              .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                              .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED };
+    ici.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+    VkImageFormatListCreateInfo ifl = { .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO,
+                                        .viewFormatCount = n,
+                                        .pViewFormats = list };
+    ici.pNext = &ifl;
+
+    /* control 1: LINEAR tiling, the size floor for this format */
+    VkImageCreateInfo ici_lin = ici;
+    ici_lin.flags = 0;
+    ici_lin.pNext = NULL;
+    ici_lin.tiling = VK_IMAGE_TILING_LINEAR;
+    /* control 2: same format, no list - what the format can do unaided */
+    VkImageCreateInfo ici_plain = ici;
+    ici_plain.flags = 0;
+    ici_plain.pNext = NULL;
+
+    VkImage img_lin = VK_NULL_HANDLE, img_plain = VK_NULL_HANDLE, img = VK_NULL_HANDLE;
+    VkResult rl = vkCreateImage(dev, &ici_lin, NULL, &img_lin);
+    VkResult rp = vkCreateImage(dev, &ici_plain, NULL, &img_plain);
+    VkResult rm = vkCreateImage(dev, &ici, NULL, &img);
+    if (rl != VK_SUCCESS || rp != VK_SUCCESS || rm != VK_SUCCESS) {
+        printf("U[%s] create: lin=%s plain=%s mut-list=%s\n", tag, vkerr(rl), vkerr(rp),
+               vkerr(rm));
+        goto out_create;
+    }
+
+    VkMemoryRequirements r_lin, r_plain, r_list;
+    vkGetImageMemoryRequirements(dev, img_lin, &r_lin);
+    vkGetImageMemoryRequirements(dev, img_plain, &r_plain);
+    vkGetImageMemoryRequirements(dev, img, &r_list);
+    {
+        /* "сохранил" = список не опустил образ ниже того, что формат умеет
+         * сама по себе.  Сравнивать надо >= , а не > : когда гейт проходит,
+         * список и non-mutable дают один и тот же размер, и строгий >
+         * объявил бы успех поражением. */
+        int base_ubwc = r_plain.size > r_lin.size;
+        const char *verdict = !base_ubwc ? "н/д — формат без UBWC"
+                                          : (r_list.size >= r_plain.size ? "да" : "НЕТ (снял)");
+        printf("U[%s] n=%u %uB/texel  memreq: lin=0x%llx nonmut=0x%llx list=0x%llx"
+               "  -> формат сам UBWC=%s, список сохранил=%s\n", tag, n, bpt,
+               (unsigned long long)r_lin.size, (unsigned long long)r_plain.size,
+               (unsigned long long)r_list.size, base_ubwc ? "да" : "нет", verdict);
+    }
+
+    /* deterministic word per 4 bytes: a wrong sector or a wrong channel
+     * order shows up as a diff rather than as silence */
+    unsigned char *pat = malloc((size_t)bytes);
+    if (!pat) { printf("U[%s] OOM на pat\n", tag); goto out_create; }
+    uint32_t *patw = (uint32_t *)pat;
+    for (VkDeviceSize i = 0; i < bytes / 4; i++) {
+        uint32_t w = 0x5a5a0000u ^ (uint32_t)(i * 2654435761u);
+        w ^= (uint32_t)(i >> 11) << 24;
+        patw[i] = w;
+    }
+
+    VkBufferCreateInfo bci = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                               .size = bytes,
+                               .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+                                        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                               .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
+    VkBuffer fb = VK_NULL_HANDLE, rb = VK_NULL_HANDLE;
+    VkMemoryRequirements fb_req, rb_req;
+    VkDeviceMemory fbm = VK_NULL_HANDLE, rbm = VK_NULL_HANDLE;
+    chk(vkCreateBuffer(dev, &bci, NULL, &fb), "U: create fill buf");
+    chk(vkCreateBuffer(dev, &bci, NULL, &rb), "U: create readback buf");
+    vkGetBufferMemoryRequirements(dev, fb, &fb_req);
+    vkGetBufferMemoryRequirements(dev, rb, &rb_req);
+    chk(alloc_mem(dev, fb_req.size, 0, &fbm), "U: alloc fill mem");
+    chk(alloc_mem(dev, rb_req.size, 0, &rbm), "U: alloc readback mem");
+    chk(vkBindBufferMemory(dev, fb, fbm, 0), "U: bind fill mem");
+    chk(vkBindBufferMemory(dev, rb, rbm, 0), "U: bind readback mem");
+    {
+        unsigned char *fp;
+        chk(vkMapMemory(dev, fbm, 0, fb_req.size, 0, (void **)&fp), "U: map fill");
+        memcpy(fp, pat, (size_t)bytes);
+        vkUnmapMemory(dev, fbm);
+    }
+
+    /* memory for all three images, bound before any transfer */
+    VkDeviceMemory plain_mem = VK_NULL_HANDLE, list_mem = VK_NULL_HANDLE,
+                   lin_mem = VK_NULL_HANDLE;
+    chk(alloc_mem(dev, r_plain.size, 0, &plain_mem), "U: alloc nonmut mem");
+    chk(alloc_mem(dev, r_list.size, 0, &list_mem), "U: alloc list mem");
+    chk(alloc_mem(dev, r_lin.size, 0, &lin_mem), "U: alloc lin mem");
+    chk(vkBindImageMemory(dev, img_plain, plain_mem, 0), "U: bind nonmut mem");
+    chk(vkBindImageMemory(dev, img, list_mem, 0), "U: bind list mem");
+    chk(vkBindImageMemory(dev, img_lin, lin_mem, 0), "U: bind lin mem");
+
+    VkBufferImageCopy bic = { .bufferOffset = 0, .bufferRowLength = W, .bufferImageHeight = 0,
+                              .imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
+                              .imageOffset = { 0, 0, 0 }, .imageExtent = { W, H, 1 } };
+
+    const char *which[3] = { "linear", "nonmut", "list" };
+    VkImage target[3] = { img_lin, img_plain, img };
+    for (int t = 0; t < 3; t++) {
+        VkImage im = target[t];
+        VkCommandBuffer cb;
+        VkCommandBufferAllocateInfo cai = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                                            .commandPool = pool,
+                                            .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                                            .commandBufferCount = 1 };
+        chk(vkAllocateCommandBuffers(dev, &cai, &cb), "U: alloc cb");
+        VkCommandBufferBeginInfo bbi = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                                         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
+        chk(vkBeginCommandBuffer(cb, &bbi), "U: begin cb");
+
+        /* 0xCD заполнитель: region, которую copy не тронул, останется 0xCDCDCDCD,
+         * а region, куда записались нули образа, станет 0x00000000.  Так
+         * "драйвер не записал" отличается от "в образе нули". */
+        {
+            unsigned char *pre;
+            chk(vkMapMemory(dev, rbm, 0, rb_req.size, 0, (void **)&pre), "U: map pre");
+            memset(pre, 0xCD, (size_t)bytes);
+            vkUnmapMemory(dev, rbm);
+        }
+
+        VkImageSubresourceRange full = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+        VkImageMemoryBarrier to_dst = { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                                        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                                        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                                        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                        .image = im, .subresourceRange = full };
+        vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             0, 0, NULL, 0, NULL, 1, &to_dst);
+        /* Прогрев.  Первый CopyBufferToImage в свежесозданный образ на turnip/740
+         * записывает ~2% текселей нулями (дёшево воспроизводится на 512x512 и для
+         * OPTIMAL, и для LINEAR, см. tests/repro-first-fill.c).  Второй fill подряд
+         * даёт точное изображение, поэтому меряем после прогрева, а не после него. */
+        vkCmdCopyBufferToImage(cb, fb, im, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bic);
+        VkImageMemoryBarrier warm = { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                                      .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                                      .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                                      .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                      .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                      .image = im, .subresourceRange = full };
+        vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             0, 0, NULL, 0, NULL, 1, &warm);
+        vkCmdCopyBufferToImage(cb, fb, im, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bic);
+        VkImageMemoryBarrier to_src = { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                                        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                                        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                                        .image = im, .subresourceRange = full };
+        vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             0, 0, NULL, 0, NULL, 1, &to_src);
+        vkCmdCopyImageToBuffer(cb, im, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb, 1, &bic);
+        chk(vkEndCommandBuffer(cb), "U: end cb");
+        VkSubmitInfo si = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .commandBufferCount = 1,
+                            .pCommandBuffers = &cb };
+        chk(vkQueueSubmit(q, 1, &si, NULL), "U: submit");
+        vkQueueWaitIdle(q);
+        vkFreeCommandBuffers(dev, pool, 1, &cb);
+
+        unsigned char *got;
+        chk(vkMapMemory(dev, rbm, 0, rb_req.size, 0, (void **)&got), "U: map readback");
+        uint32_t *gotw = (uint32_t *)got;
+        size_t bad = 0, first = (size_t)-1, last = 0, zeros = 0, untouched = 0;
+        size_t bad_in_tail = 0;
+        size_t total = (size_t)(bytes / 4);
+        for (size_t i = 0; i < total; i++) {
+            if (gotw[i] == 0)
+                zeros++;
+            if (gotw[i] == 0xcdcdcdcdu)
+                untouched++;
+            if (gotw[i] != patw[i]) {
+                if (first == (size_t)-1)
+                    first = i;
+                last = i;
+                bad++;
+                /* хвост: последние 1/16 образа */
+                if (i >= total - total / 16)
+                    bad_in_tail++;
+            }
+        }
+        printf("U[%s] %s roundtrip: %zu/%zu слов %s", tag, which[t], bad, total,
+               bad ? "MISMATCH" : "EXACT");
+        if (first != (size_t)-1) {
+            size_t row0 = first / W, col0 = first % W;
+            size_t rowN = last / W, colN = last % W;
+            printf("  bad[0]=%zu(r%zu,c%zu) bad[N]=%zu(r%zu,c%zu) zeros=%zu не тронуто(0xCD)=%zu",
+                   first, row0, col0, last, rowN, colN, zeros, untouched);
+            printf("  pat=0x%08x got=0x%08x", patw[first], gotw[first]);
+        }
+        printf("\n");
+        vkUnmapMemory(dev, rbm);
+    }
+
+    vkFreeMemory(dev, plain_mem, NULL);
+    vkFreeMemory(dev, list_mem, NULL);
+    vkFreeMemory(dev, lin_mem, NULL);
+    vkDestroyBuffer(dev, fb, NULL);
+    vkDestroyBuffer(dev, rb, NULL);
+    vkFreeMemory(dev, fbm, NULL);
+    vkFreeMemory(dev, rbm, NULL);
+    free(pat);
+
+out_create:
+    if (img) vkDestroyImage(dev, img, NULL);
+    if (img_plain) vkDestroyImage(dev, img_plain, NULL);
+    if (img_lin) vkDestroyImage(dev, img_lin, NULL);
+}
+
 int main(void) {
     VkInstance inst;
     VkApplicationInfo ai = { VK_STRUCTURE_TYPE_APPLICATION_INFO, NULL, "sparse_test", 1, NULL, 0, VK_API_VERSION_1_3 };
@@ -2823,6 +3364,86 @@ skip_b:
             } else {
                 printf("T probe: create rejected - unexpected for non-sparse mutable BGRA8\n");
             }
+        }
+
+        /* U. The five vkd3d TYPELESS classes that mix SFLOAT with the integer
+         * family.  Stock leaves every _FLOAT out of fd6_ubwc_compat_mode(), so
+         * tu6_mutable_format_list_ubwc_compatible() fails and the class loses
+         * UBWC.  These are the classes D3D12 actually builds, so the consumer is
+         * real (unlike the BGR pairs).  Baseline on the current tree: every row
+         * must read "снял" (stock/0006 gate), nonmut roundtrip EXACT since that
+         * image is plain UBWC of one format.  A gate patch admitting the _SFLOAT
+         * members must flip the verdict to "да" and keep both roundtrips EXACT. */
+        {
+            /* контроль формата, без участия списка: n=1 => гейт проходит
+             * тривиально, UBWC должен остаться.  Если и тут MISMATCH, то дело
+             * в формате/копировании, а не в списке форматов. */
+            static const VkFormat f_c_rgba8[] = { VK_FORMAT_R8G8B8A8_UNORM };
+            static const VkFormat f_c_bgra8[] = { VK_FORMAT_B8G8R8A8_UNORM };
+            static const VkFormat f_c_r32u[] = { VK_FORMAT_R32_UINT };
+            static const VkFormat f_c_r32f[] = { VK_FORMAT_R32_SFLOAT };
+            static const VkFormat f_c_r16g16u[] = { VK_FORMAT_R16G16_UINT };
+            static const VkFormat f_c_r16g16f[] = { VK_FORMAT_R16G16_SFLOAT };
+            static const VkFormat f_c_r32g32u[] = { VK_FORMAT_R32G32_UINT };
+            static const VkFormat f_c_r32g32f[] = { VK_FORMAT_R32G32_SFLOAT };
+            static const VkFormat f_r32[] = { VK_FORMAT_R32_SFLOAT, VK_FORMAT_R32_UINT,
+                                              VK_FORMAT_R32_SINT };
+            static const VkFormat f_r16g16[] = { VK_FORMAT_R16G16_SFLOAT, VK_FORMAT_R16G16_UINT,
+                                                 VK_FORMAT_R16G16_SINT, VK_FORMAT_R16G16_UNORM,
+                                                 VK_FORMAT_R16G16_SNORM };
+            static const VkFormat f_r32g32[] = { VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32_UINT,
+                                                 VK_FORMAT_R32G32_SINT };
+            static const VkFormat f_r16g16b16a16[] = { VK_FORMAT_R16G16B16A16_SFLOAT,
+                                                        VK_FORMAT_R16G16B16A16_UNORM,
+                                                        VK_FORMAT_R16G16B16A16_SNORM,
+                                                        VK_FORMAT_R16G16B16A16_UINT,
+                                                        VK_FORMAT_R16G16B16A16_SINT };
+            static const VkFormat f_r32g32b32a32[] = { VK_FORMAT_R32G32B32A32_SFLOAT,
+                                                        VK_FORMAT_R32G32B32A32_UINT,
+                                                        VK_FORMAT_R32G32B32A32_SINT };
+            /* Список, который vkd3d строит для typeless-BGRA8 под UAV
+             * (resource.c:393-401): к B8G8R8A8_UNORM/SRGB добавляются все три
+             * R32 из-за правила D3D11 про typed UAV loads. На стоке именно он
+             * уходит в linear — из всех 72 классов. Сторона BGRA8 (fill и
+             * readback форматом образа) меряется здесь, сторона R32-вида —
+             * отдельно, в probe_mixed_swap_uav. */
+            static const VkFormat f_bgra8_uav[] = { VK_FORMAT_B8G8R8A8_UNORM,
+                                                    VK_FORMAT_B8G8R8A8_SRGB,
+                                                    VK_FORMAT_R32_UINT,
+                                                    VK_FORMAT_R32_SINT,
+                                                    VK_FORMAT_R32_SFLOAT };
+            static const struct {
+                const char *tag;
+                VkFormat base;
+                const VkFormat *f;
+                unsigned n;
+                unsigned bpt;
+            } u[] = {
+                { "CTRL_RGBA8", VK_FORMAT_R8G8B8A8_UNORM, f_c_rgba8, 1, 4 },
+                { "CTRL_BGRA8", VK_FORMAT_B8G8R8A8_UNORM, f_c_bgra8, 1, 4 },
+                { "CTRL_R32_UINT", VK_FORMAT_R32_UINT, f_c_r32u, 1, 4 },
+                { "CTRL_R32_SFLOAT", VK_FORMAT_R32_SFLOAT, f_c_r32f, 1, 4 },
+                { "CTRL_R16G16_UINT", VK_FORMAT_R16G16_UINT, f_c_r16g16u, 1, 4 },
+                { "CTRL_R16G16_SFLOAT", VK_FORMAT_R16G16_SFLOAT, f_c_r16g16f, 1, 4 },
+                { "CTRL_R32G32_UINT", VK_FORMAT_R32G32_UINT, f_c_r32g32u, 1, 8 },
+                { "CTRL_R32G32_SFLOAT", VK_FORMAT_R32G32_SFLOAT, f_c_r32g32f, 1, 8 },
+                { "R32_TYPELESS", VK_FORMAT_R32_SFLOAT, f_r32, ARRAY_SIZE(f_r32), 4 },
+                { "R16G16_TYPELESS", VK_FORMAT_R16G16_SFLOAT, f_r16g16, ARRAY_SIZE(f_r16g16), 4 },
+                { "R32G32_TYPELESS", VK_FORMAT_R32G32_SFLOAT, f_r32g32, ARRAY_SIZE(f_r32g32), 8 },
+                { "R16G16B16A16_TYPELESS", VK_FORMAT_R16G16B16A16_SFLOAT, f_r16g16b16a16,
+                  ARRAY_SIZE(f_r16g16b16a16), 8 },
+                { "R32G32B32A32_TYPELESS", VK_FORMAT_R32G32B32A32_SFLOAT, f_r32g32b32a32,
+                  ARRAY_SIZE(f_r32g32b32a32), 16 },
+                { "B8G8R8A8_UAVLIST", VK_FORMAT_B8G8R8A8_UNORM, f_bgra8_uav,
+                  ARRAY_SIZE(f_bgra8_uav), 4 },
+            };
+            for (unsigned i = 0; i < ARRAY_SIZE(u); i++)
+                probe_ubwc_class(dev, q, pool, u[i].tag, u[i].base, u[i].f, u[i].n, u[i].bpt);
+
+            /* vkd3d-овский список для typeless-BGRA8 под UAV: единственный класс,
+             * который на стоке уходит в linear, и единственный, где linear
+             * меняет то, что видно через второй вид. */
+            probe_mixed_swap_uav(dev, q, pool, "BGR+R32");
         }
 
         free(fill1);
