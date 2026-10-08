@@ -115,6 +115,20 @@
  *      upstream restriction (tu_formats.cc, "Don't support multi-planar
  *      formats with sparse yet"); vkd3d never asks it (utils.c bails out for
  *      plane_count > 1).
+ *   V) Sweep of ALL 70 format lists vkd3d-proton can build, against the
+ *      sparse+mutable gate. The class table is generated from vkd3d's own
+ *      sources (scripts/gen-vkd3d-lists.py -> vkd3d-fmt-classes.h) so it
+ *      cannot drift. 70 = the classes with >= 2 formats in the list, which is
+ *      exactly where vkd3d sets MUTABLE_FORMAT_BIT ("if (list->format_count
+ *      < 2) return false;"), so MUTABLE always comes with a list here.
+ *      Each class is asked three times - SPARSE+MUTABLE+list (what vkd3d does
+ *      for a reserved resource), MUTABLE alone, and SPARSE alone with no list
+ *      - at two usage sets, and the survivors get a real vkCreateImage.
+ *      Result: 0/70 rejected by the sparse x mutable gate, 0 query/create
+ *      gaps, and the whole V block is byte-identical on stock and patched.
+ *      So 0004 is unreachable from vkd3d's default path (only the planar
+ *      no-list branch, probe N2, gets there), and the E/F hole it closes was
+ *      unreachable from vkd3d too.
  * Verdict: the INT-8888 "transform" is the invalid UNORM-image + usampler
  * combination - a format-class mismatch whose result is the spec-defined
  * "poison" texel value (a test artifact, no driver/HW bug). Real integer
@@ -134,6 +148,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+
+/* Сгенерировано scripts/gen-vkd3d-lists.py из исходников vkd3d-proton:
+ * все списки совместимости, которые vkd3d способен построить (те, где
+ * форматов >= 2, - только там он ставит MUTABLE_FORMAT_BIT). */
+#include "vkd3d-fmt-classes.h"
 
 static const uint32_t cast_rgba_spv[] = {
     0x07230203, 0x00010000, 0x000d000b, 0x00000044, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
@@ -1205,6 +1226,154 @@ skip_b:
         ifn.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
         printf("N3 query(SPARSE_RESIDENCY+MUTABLE, NV12, no list): %s\n",
                vkerr(vkGetPhysicalDeviceImageFormatProperties2(pd, &ifn, &ifpn)));
+    }
+
+    /* V. Every format list vkd3d-proton can actually build, against the
+     * sparse+mutable gate. This is the sweep that replaces "what would a game
+     * hit" with a closed list.
+     *
+     * The path is narrow by construction. In vkd3d:
+     *   - sparse_resource = !heap_properties, and the only caller that passes
+     *     NULL is d3d12_resource_create_vk_resource:
+     *         heap_properties = resource->flags & VKD3D_RESOURCE_RESERVED
+     *                          ? NULL : &resource->heap_properties;
+     *     so SPARSE_* lands only on CreateReservedResource. The reserved
+     *     fallback (d3d12_resource_create_reserved_fallback) ends in
+     *     d3d12_resource_create_committed, i.e. NOT sparse.
+     *   - MUTABLE_FORMAT_BIT is set only when the list has >= 2 formats
+     *     (vkd3d_get_format_compatibility_list: "if (list->format_count < 2)
+     *     return false;"), so MUTABLE always comes with a list here.
+     * Therefore the whole question is: which of vkd3d's own lists does turnip
+     * accept together with SPARSE_RESIDENCY.
+     *
+     * The class table is generated from vkd3d's own sources by
+     * scripts/gen-vkd3d-lists.py (vkd3d-fmt-classes.h), so it cannot drift.
+     *
+     * Each class gets two queries with the same list and the same usage:
+     *   sparse   = SPARSE_BINDING|SPARSE_RESIDENCY|MUTABLE  (the reserved case)
+     *   mutable  = MUTABLE only                              (control)
+     * A class counts as REJECTED only when sparse fails and mutable succeeds:
+     * that isolates the sparse gate. sparse==mutable==fail means something
+     * else refuses the format+usage, which is a separate finding. */
+    printf("\n=== V. все %d списков совместимости vkd3d против SPARSE+MUTABLE ===",
+           VKD3D_MUTABLE_CLASS_COUNT);
+    {
+        /* Два набора usage. Первый - как у реального vkd3d-ресурса (текстура
+         * плюс UAV). Второй - ровно тот, которым vkd3d сам спрашивает
+         * поддержку sparse (utils.c: TRANSFER_DST|TRANSFER_SRC), нужен чтобы
+         * отличить отказ из-за формата от отказа из-за usage. */
+        const struct { const char *tag; VkImageUsageFlags usage; } sets[] = {
+            { "full",  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT },
+            { "vkd3d", VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT },
+        };
+        unsigned int s;
+
+        for (s = 0; s < ARRAY_SIZE(sets); s++) {
+            unsigned int rejected = 0, both_fail = 0, create_fail = 0, ok = 0;
+
+            for (unsigned int c = 0; c < VKD3D_MUTABLE_CLASS_COUNT; c++) {
+                VkImageFormatListCreateInfo ifl_v = {
+                    VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO, NULL,
+                    vkd3d_fmt_classes[c].n, vkd3d_fmt_classes[c].f
+                };
+                VkPhysicalDeviceImageFormatInfo2 ifi_v = {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
+                    .format = vkd3d_fmt_classes[c].f[0],
+                    .type = VK_IMAGE_TYPE_2D,
+                    .tiling = VK_IMAGE_TILING_OPTIMAL,
+                    .usage = sets[s].usage,
+                    .pNext = &ifl_v,
+                };
+                VkImageFormatProperties2 ifp_v = { VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2, NULL };
+                VkResult r_sparse, r_mutable, r_sparse_only;
+
+                /* (1) ровно то, что делает vkd3d для reserved-ресурса */
+                ifi_v.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT |
+                              VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT |
+                              VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+                r_sparse = vkGetPhysicalDeviceImageFormatProperties2(pd, &ifi_v, &ifp_v);
+
+                /* (2) mutable без sparse - тот же список, но не reserved */
+                ifi_v.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+                r_mutable = vkGetPhysicalDeviceImageFormatProperties2(pd, &ifi_v, &ifp_v);
+
+                /* (3) sparse без mutable и без списка. Отдельно от (1), чтобы
+                 * отличить гейт «sparse x mutable» (именно он и есть цель
+                 * 0004) от апстримных ограничений на сам sparse - например
+                 * «Don't support multi-planar formats with sparse yet». */
+                ifi_v.pNext = NULL;
+                ifi_v.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT |
+                              VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT;
+                r_sparse_only = vkGetPhysicalDeviceImageFormatProperties2(pd, &ifi_v, &ifp_v);
+                ifi_v.pNext = &ifl_v;
+
+                if (r_sparse) {
+                    if (!r_mutable && !r_sparse_only) {
+                        /* Единственная ситуация, которую действительно
+                         * ловит гейт 0004: ни sparse, ни mutable по отдельности
+                         * не запрещены, а вместе - да. */
+                        rejected++;
+                        printf("V[%s] %-24s n=%u sparse+mut=%-19s mut=%-11s sparse=%-11s"
+                               "  <-- ОТКАЗ ГЕЙТА sparse x mutable\n",
+                               sets[s].tag, vkd3d_fmt_classes[c].dxgi,
+                               vkd3d_fmt_classes[c].n, vkerr(r_sparse),
+                               vkerr(r_mutable), vkerr(r_sparse_only));
+                    } else {
+                        both_fail++;
+                        printf("V[%s] %-24s n=%u sparse+mut=%-19s mut=%-11s sparse=%-11s"
+                               "  (не гейт: запрещён сам %s)\n",
+                               sets[s].tag, vkd3d_fmt_classes[c].dxgi,
+                               vkd3d_fmt_classes[c].n, vkerr(r_sparse),
+                               vkerr(r_mutable), vkerr(r_sparse_only),
+                               r_sparse_only ? "sparse" : "mutable");
+                    }
+                } else if (r_mutable) {
+                    both_fail++;
+                    printf("V[%s] %-24s n=%u sparse+mut=%-19s mut=%-11s sparse=%-11s"
+                           "  (мутабельность запрещена и без sparse - другой вопрос)\n",
+                           sets[s].tag, vkd3d_fmt_classes[c].dxgi, vkd3d_fmt_classes[c].n,
+                           vkerr(r_sparse), vkerr(r_mutable), vkerr(r_sparse_only));
+                } else {
+                    /* Query passed. That is only a pre-filter: the whole point of
+                     * 0004 was that query and create used to disagree, so the
+                     * create has to be asked too. */
+                    VkImageCreateInfo iic = {
+                        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                        .pNext = &ifl_v,
+                        .imageType = VK_IMAGE_TYPE_2D,
+                        .format = vkd3d_fmt_classes[c].f[0],
+                        .extent = { 64, 64, 1 },
+                        .mipLevels = 1,
+                        .arrayLayers = 1,
+                        .samples = VK_SAMPLE_COUNT_1_BIT,
+                        .tiling = VK_IMAGE_TILING_OPTIMAL,
+                        .usage = sets[s].usage,
+                        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                        .flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT |
+                                 VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT |
+                                 VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
+                    };
+                    VkImage img_c = VK_NULL_HANDLE;
+                    VkResult r_create = vkCreateImage(dev, &iic, NULL, &img_c);
+
+                    if (r_create) {
+                        create_fail++;
+                        printf("V[%s] %-24s n=%u query=OK, create=%s  <-- ЗАЗОР query/create\n",
+                               sets[s].tag, vkd3d_fmt_classes[c].dxgi,
+                               vkd3d_fmt_classes[c].n, vkerr(r_create));
+                    } else {
+                        vkDestroyImage(dev, img_c, NULL);
+                        ok++;
+                    }
+                }
+            }
+            printf("V[%s] ИТОГ: отвергнуто связкой SPARSE+MUTABLE %u/%u, "
+                   "не проходят и без sparse %u, зазоров query/create %u, принято %u\n",
+                   sets[s].tag, rejected, VKD3D_MUTABLE_CLASS_COUNT,
+                   both_fail, create_fail, ok);
+        }
     }
 
     /* G0. Format-query side of the E/F hole (P1): the query must refuse
