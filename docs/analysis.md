@@ -518,3 +518,64 @@ sudo mount --bind /var/lib/rp6-mesa/libvulkan_freedreno.so \
 юнитом в `/etc/systemd/system` — `/usr` при этом тоже не трогается. Для
 vkd3d-proton, если понадобится подмена библиотеки, приём тот же: файл
 живёт вне префикса, монтируется на место.
+
+## 8. Запуск игры на устройстве и чтение логов
+
+Игра — сторонний репак вне Steam, префикс — от Heroic (sideload). Запуск идёт
+напрямую через proton, минуя и Steam, и Heroic: Heroic добавляет umu-launcher,
+и тогда не видно, что именно получает игра.
+
+```sh
+scripts/run-game.sh stock 300     # пакетный драйвер — базовая линия
+scripts/run-game.sh patched 120   # патченый из build/out через VK_DRIVER_FILES
+```
+
+```sh
+scripts/curate-game-log.sh results/raw/game-stock.log   # отфильтровать вручную
+```
+
+### Что важно в скрипте
+
+- **CWD = папка игры.** RE4 открывает `re_chunk_000.pak` и `local_config.ini`
+  относительно текущего каталога. Запуск из репы оставлял в репе пустой
+  `local_config.ini` (32 байта) вместо настоящего (20 КБ), и игра давала
+  **чёрный экран** — при этом отказы vkd3d были ровно те же, что в удачном
+  прогоне. То есть чёрный экран к feature level отношения не имеет.
+- `VK_DRIVER_FILES` указывает на `build/out/freedreno_icd.json`; `/usr` не
+  трогается. С ним устройство одно (Adreno), без него — два (Adreno + llvmpipe).
+- `STEAM_COMPAT_APP_ID=2050650` нужен только protonfixes (выбор фиксов).
+- Логи: полный вывод proton/wine — `results/raw/game-<mode>.log` (в
+  `.gitignore`: 1.2 МБ, из них значимых строк единицы), отфильтрованный —
+  `results/game-<mode>.log` (их собирает `scripts/curate-game-log.sh`).
+
+### Что смотреть в логе
+
+| Строка | Что означает |
+|---|---|
+| `d3d12_device_create: Feature level 0xc100 is not supported` | отказ на 12_1 (`0xc100`) |
+| `d3d12_device_create: Feature level 0xc000 is not supported` | отказ на 12_0; дальше vkd3d откатывается на 11_1 |
+| `dxgi_vk_swap_chain_init` / `Reallocating swapchain` | устройство создано и идёт смена режима — игра стартовала |
+| `DxvkInstance::createInstance: Failed to create Vulkan instance` | DXVK не создал Vulkan-инстанс: игра не запустится вообще |
+| `[Vulkan Loader]` | вывод загрузчика (`VK_LOADER_DEBUG`); при `error,warn` молчит, если ICD грузится без ошибок |
+
+`VK_LOADER_DEBUG` по умолчанию `error,warn`; полную картину по ICD даёт
+`VK_LOADER_DEBUG=all scripts/run-game.sh patched`.
+
+### Что измерено
+
+- **сток, CWD = папка игры**: отказы 12_1 и 12_0, откат на 11_1, swapchain
+  1920x1080 → 2560x1440, пайплайны постобработки грузятся, **игра
+  загружается**. Отдельного «только 12_0» режима у игры нет — 11_1 её
+  устраивает (`results/game-stock.log`).
+- **сток, CWD = репа**: те же отказы, но `local_config.ini` ушёл в репу →
+  чёрный экран.
+- **один стоковый ICD** (через `VK_DRIVER_FILES` на пакетный freedreno) — то
+  же поведение: значит «одно устройство вместо двух» само по себе ничего не
+  меняет.
+- **патченый ICD**: `sparseResidencyImage2D = true`, но DXVK падает на
+  `vkCreateInstance` ещё до игры (`results/game-patched.log`). Дело не в
+  зависимостях: патченый `.so` линкуется только с `libz`, `libdrm`, `libexpat`,
+  `libstdc++` и `libc` — gallium в него вкомпилен.
+
+Отдельно про память: 7.3 ГБ RAM на устройстве общие с GPU. Игра держит ~1.2 ГБ
+resident плюс ~1.1 ГБ в zram, то есть идёт свопинг; OOM при этом не наблюдался.
