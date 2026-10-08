@@ -1621,14 +1621,117 @@ else if (templ->bind & ZINK_BIND_VIDEO) { … }            /* плоскости
 **порядок каналов одинаковый**, кросс-порядка нет.
 
 Итог: кросс-порядковые списки недостижимы ни для D3D12, ни для GL через Zink.
-Отдельно стоит, что Zink постоянно строит **uniform-swap** списки
-(`RGBA8_UNORM ↔ RGBA8_SRGB`), и именно их чинит **патч 0005**: на стоке они
-падают в linear без UBWC, с 0005 остаются tiled+сжатыми. Это реальная
-оптимизация для GL-игр на Zink — в отличие от cross-order, у которого
-потребителей нет.
+
+Про Zink-пары `формат + sRGB-вариант` — см. §16.2: они и на стоке остаются
+tiled+UBWC, до `has_swaps` дело не доходит. Ни кросс-порядка, ни uniform-swap
+списка, ради которых написан патч 0005, ни D3D12, ни Zink не строят.
+
+### 16.2. Кто реально попадает в linear: перебор с учётом раннего выхода
+
+Первый разбор §16.1 дал неверный вывод («0005 чинит Zink-пары `RGBA8 ↔ RGBA8_SRGB`»).
+Причина — упрощённый перебор, который считал только `has_swaps()`. Решающая
+деталь, которую он проглядел: **`tu6_mutable_format_list_ubwc_compatible()` стоит
+выше `has_swaps()` и пропускает весь блок целиком**, и этот гейт есть в стоке:
+
+```c
+// tu_image.cc:539 — сток, tu_image.cc:530 — git HEAD, без наших правок
+if ((pCreateInfo->flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+    !vk_format_is_depth_or_stencil(image->vk.format)) {
+   const VkImageFormatListCreateInfo *fmt_list = …;
+   if (!tu6_mutable_format_list_ubwc_compatible(info, fmt_list)) {
+      … NV12-ветка, снятие UBWC, r8g8_r16, has_swaps …
+   }
+}
+```
+
+Тот же ранний выход есть и в `tu6_mutable_format_list_forces_linear()`
+(`tu_formats.cc:230`), то есть в sparse-запросе патча 0004 — он тоже
+согласован с create. Совместимость списка решает `fd6_ubwc_compat_mode()`
+(`freedreno_ubwc.h`), где `linear`-вариант и `_SRGB`-вариант одного формата
+всегда дают **один и тот же** тип.
+
+Свойства FD740: `freedreno_devices.py` → `[a7xx_base, a7xx_gen2]`, то есть
+`ubwc_unorm_snorm_int_compatible = True`, `ubwc_all_formats_compatible = 0`.
+Перебор: `scripts/fmt-list-gate-check.py` (переносит предикаты драйвера на
+Python, свойства берёт из `fd6_format_table.c` и `fd6_ubwc_compat_mode()`).
+
+**vkd3d, 70 классов `tests/vkd3d-fmt-classes.h`:**
+
+| Судьба | Классов | create на стоке | +0005 | +0005+0006 |
+|---|---|---|---|---|
+| ранний выход, список UBWC-совместим | 31 | tiled+UBWC | то же | то же |
+| гейт не прошёл, но swap'ов нет | 38 | tiled, UBWC снят | то же | то же |
+| планарный NV12 | 1 | tiled, UBWC снят | то же | то же |
+| **в linear** | **0** | — | — | — |
+
+**Ни один класс vkd3d на gen2 не доходит до linear даже на стоке.** Шесть
+BGRA-классов (`tests/vkd3d-fmt-classes.h:51-56`) — это
+`{B8G8R8A8_UNORM, B8G8R8A8_SRGB}`, оба формала дают `FD6_UBWC_B8G8R8A8_UNORM`,
+гейт проходит, и сток специально содержит этот случай с комментарием
+«zink would really like to». Прежние «6 BGRA-классов в linear» были ошибкой
+перебора.
+
+**Zink.** `setup_format_list()` (`zink_resource.c:1561`) строит ровно два вида
+списков — `(F, F_SRGB)` и плоскости видеоформата. Из 11 пар `(F, F_SRGB)`,
+которые вообще есть в таблице форматов:
+
+| Пары | create сток | +0005 | +0006 |
+|---|---|---|---|
+| `R8G8B8A8`, `R8G8`, `B8G8R8A8` (3) | tiled+UBWC (ранний выход) | то же | то же |
+| `A8B8G8R8`, `A8R8G8B8`, `B8G8R8X8`, `X8B8G8R8`, `X8R8G8B8` (5) | **linear** | tiled | linear |
+| `L8`, `R8`, `R8G8B8X8` (3) | tiled, UBWC снят | то же | то же |
+
+Но и эти пять пар Zink не строит. GL отдаёт Zink из этого набора только
+`B8G8R8A8_UNORM` (`st_format.c:268`, `{ GL_BGRA, GL_BGRA8_EXT, 0 }`), а его
+пара проходит гейт. `PIPE_FORMAT_A8R8G8B8_*`, `A8B8G8R8_*`, `X8R8G8B8_*`,
+`X8B8G8R8_*`, `B8G8R8X8_*` в `src/gallium/drivers/zink/` не встречаются ни
+разу — только внутри `zink_format_emulate_x8()`, то есть как результат
+эмуляции, а не как формат ресурса.
+
+Третий случай Zink — `ZINK_BIND_MUTABLE`. Тут список форматов **отсутствует**:
+`init_ici()` (`zink_resource.c`) ставит `MUTABLE_FORMAT_BIT` и обнуляет
+`pNext`; `emit_usage_candidates()` при `always_mutable` и не строит
+fmtlist-вариант. Такой образ → linear без UBWC на стоке и с патчами, и это
+правильно: список не задан, значит приложение вправе переинтерпретировать
+образ в любой совместимый формат, и `has_swaps(NULL) == true` по стоковой
+задумке. Пары x8/alpha-эмуляции (`zink_format_needs_mutable()`,
+`zink_format.h:53`) дают `false`, то есть mutable для них не нужен вовсе.
+
+**Кого тогда чинит 0005.** Перебор всех упорядоченных пар форматов таблицы
+(`--all-pairs`, 115×114):
+
+- **0005** возвращает тайлинг для **158** пар — исключительно BGR/BGRA-семейство
+  (`B5G6R5 ↔ B5G5R5A1`, `B5G6R5 ↔ B8G8R8A8`, …). Из них **18** пар перекрывает
+  0006 (`B8G8R8A8` с `UNORM/SRGB/SNORM/UINT/SINT`, и там ещё и UBWC
+  возвращается), остальные **140** — только 0005.
+- **0006** — 18 пар: ровно `{B8G8R8A8_X, B8G8R8A8_Y}` для всех
+  `X ≠ Y` из `{UNORM, SNORM, UINT, SINT, SRGB}`.
+- `r8g8_r16` не срабатывает ни на одной паре форматов таблицы.
+
+Ни vkd3d, ни Zink этих списков не строят: vkd3d отображает DXGI-BGR-форматы в
+**RGBA-порядок** (`B5G6R5 → VK_FORMAT_R5G6B5_UNORM_PACK16`,
+`B5G5R5A1 → A1R5G5B5_UNORM_PACK16`, `B4G4R4A4 → A4R4G4B4_UNORM_PACK16`,
+`A4B4G4R4 → R4G4B4A4_UNORM_PACK16` — `utils.c:114-138`), а из BGRA8 строит
+только пару `UNORM ↔ UNORM_SRGB`.
+
+Итог: **на gen2 ни 0005, ни 0006 не меняют ни одного образа ни у D3D12, ни у
+GL/Zink.** Оба логически верны и реализуют upstream-TODO, оба безопасны, но
+потребитель у них — только наши собственные синтетические пробы S и T. Держать
+их в рабочем стеке для ArmadOS смысла нет; `0004` (снятие гейта sparse) и
+`0009` (NV12) — другое дело, они меняют поведение на реальных списках.
+
+**Побочный риск 0004, найденный при этом разборе.** vkd3d создаёт
+`MUTABLE` **без** списка форматов в трёх местах (`libs/vkd3d/resource.c`):
+планарные форматы (`:383`, `:363` — `VK_IMAGE_ASPECT_PLANE_0_BIT`),
+переполнение списка совместимости (`:365-368`, нужно 10 форматов из
+`VKD3D_MAX_COMPATIBLE_FORMAT_COUNT = 10`) и обход
+`DISABLE_SIMULTANEOUS_UAV_COMPRESSION` (`:826`). Первый случай на gen2 —
+это NV12, и его закрывает 0009. Вторые два дают linear + sparse → наш 0004
+отклоняет create (`FEATURE_NOT_PRESENT`, ровно как проба F), то есть vkd3d
+получит ошибку вместо тихой порчи. Это осознанный размен: апстрим вместо
+отказа просто не объявляет `sparseResidencyImage2D`.
 
 ## 17. Замер памяти RE4 (30.09)
-
 Методика: прогон `scripts/run-game.sh patched 150` с
 `VKD3D_CONFIG=log_memory_budget VKD3D_DEBUG=info VKD3D_LOG_FILE=...`
 (vkd3d печатает каждую аллокацию: размер + нарастающий итог по
