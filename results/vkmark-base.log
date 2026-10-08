@@ -1,0 +1,16 @@
+=======================================================
+    vkmark 2025.01
+=======================================================
+    Vendor ID:      0x5143
+    Device ID:      0x43050A01
+    Device Name:    Turnip Adreno (TM) 740
+    Driver Version: 109060099
+    Device UUID:    92d4645bce8e48c444e6a764b134da0b
+=======================================================
+[clear] <default>: FPS: 17678 FrameTime: 0.057 ms
+[vertex] <default>: FPS: 7097 FrameTime: 0.141 ms
+[shading] <default>: FPS: 6333 FrameTime: 0.158 ms
+[texture] <default>: FPS: 6513 FrameTime: 0.154 ms
+=======================================================
+                                   vkmark Score: 9405
+=======================================================
