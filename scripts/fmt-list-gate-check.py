@@ -46,9 +46,13 @@ UNKNOWN = "UNKNOWN_COMPAT"
 NV12_VK = "G8_B8R8_2PLANE_420_UNORM"
 
 # a7xx_gen2 (FD740) из src/freedreno/common/freedreno_devices.py.
-# has_8bpp_ubwc = False наследуется от a6xx_gen2, supports_uav_ubwc = True стоит
-# прямо в a7xx_gen2, то есть у UAV-образов гейт списка — действительно
-# ограничивающий фактор, а у 8-битных на блок — нет.
+# has_8bpp_ubwc в a7xx-цепочке ([a7xx_base, a7xx_gen2]) нигде не стоит —
+# C-структура зануляется, т.е. False по умолчанию (НЕ наследуется от a6xx_gen2).
+# supports_uav_ubwc = True стоит прямо в a7xx_gen2, то есть у UAV-образов гейт
+# списка — действительно ограничивающий фактор, а у 8-битных на блок — нет.
+# Замер (2026-10-02, FD_DEV_FEATURES=has_8bpp_ubwc=1): потолок memreq у R8 есть
+# (0x40000 -> 0x42000), но содержимое под UBWC порчено (roundtrip — все нули),
+# т.е. флаг — защита от порчи, держать False. results/test-r8-has8bpp-*.log.
 GEN2_PROPS = {"ubwc_unorm_snorm_int_compatible": True, "ubwc_all_formats_compatible": False,
               "has_8bpp_ubwc": False, "supports_uav_ubwc": True}
 
@@ -81,7 +85,7 @@ def why_unknown(f, props):
     if is_compressed(f):
         return "сжатый/плоский: UBWC невозможен"
     if re.fullmatch(r"R8(?:_[A-Z]+)?", g):
-        return "8 бит на блок: has_8bpp_ubwc=False"
+        return "8 бит на блок: has_8bpp_ubwc=False (защита от порчи; memreq-потолок есть, содержимое под UBWC — все нули, test-r8-has8bpp-on.log)"
     if g in ("Z32_FLOAT", "Z24_UNORM_S8_UINT", "D24_UNORM_S8_UINT", "D32_SFLOAT",
              "X8_D24_UNORM_PACK32", "D16_UNORM"):
         return "глубина: отдельная семантика clear"
