@@ -1,0 +1,43 @@
+EXPERIMENT 0007 - NOT FOR COMMIT. NV12 + MUTABLE: keep tiling, drop only UBWC.
+
+The code argument for a driver-side fix of the planar branch (probe N2) is
+that for a planar base format MUTABLE changes only the *compression*, not the
+layout:
+
+  - tu_image_view_init maps an R8_UNORM view of PLANE_0 straight back to
+    PIPE_FORMAT_Y8_UNORM ("The 0'th plane of this format has a different UBWC
+    compression"), i.e. it treats the reinterpretation as layout-identical;
+  - the plane-0 layout is built with exactly that format (tu6_plane_format ->
+    PIPE_FORMAT_Y8_UNORM, handed to the layout in tu_image_init).
+
+If that holds, `ubwc_enabled = false` alone is enough in the NV12 branch and
+`force_linear_tile = true` is redundant. That has a concrete payoff: with
+tiling kept, 0004's own check (it rejects any SPARSE_RESIDENCY image whose
+tile_mode is not TILE6_3) stops firing, so NV12 + MUTABLE + SPARSE becomes
+creatable and the one-line vkd3d fix for the planar branch is not needed at
+all. It is also a general win rather than a gen2 quirk: NV12 + MUTABLE is
+ordinary for video, and those images are linear today.
+
+What this patch does: delete `force_linear_tile = true;` from the NV12 branch
+and nothing else. UBWC is still disabled, so the compression argument the
+branch is built on is respected; only the tiling demotion goes away.
+
+How to read the result: probe W compares PLANE_0's subresource layout against
+a real tiled R8_UNORM image of the same geometry, and round-trips plane 0
+through a transfer. Layout identity is what the code argument rests on. Caveat
+kept deliberately in the test comment: layout identity does not prove the
+sampling path (a new R8 sampling shader would be needed for that), and the
+transfer path cannot carry a view at all - vkCmdCopyImageToBuffer takes a
+VkImage, so "read plane 0 through an R8_UNORM view" is not expressible as a
+copy.
+
+--- a/src/freedreno/vulkan/tu_image.cc
++++ b/src/freedreno/vulkan/tu_image.cc
+@@ -555,7 +555,6 @@
+                   fmt_list ? "present" : "missing");
+             }
+             ubwc_enabled = false;
+-            force_linear_tile = true;
+          } else if (!mutable_ubwc_fc) {
+             if (ubwc_enabled) {
+                if (fmt_list && fmt_list->viewFormatCount == 2) {

@@ -1615,3 +1615,152 @@ VK_EXT_memory_budget), `TU_DEBUG=bos` (топ живых BO turnip; печата
    swappiness=180/zram — только с root, вне контура проекта.
 5. `TU_DEBUG=bos` при повторных замерах не использовать: дамп после
    каждого submit = 242 МБ лога.
+
+## 18. NV12 + MUTABLE: `force_linear_tile` избыточен (патч 0009)
+
+### 18.1 Что было замечено
+
+Ветка планарного NV12 в `tu_image.cc` для образов с
+`VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT` выставляла сразу два запрета —
+`ubwc_enabled = false` **и** `force_linear_tile = true`. Второй запрет
+делал невозможным создание NV12 + MUTABLE + SPARSE_RESIDENCY: гейт из
+патча 0004 отказывает на create при `tile_mode != TILE6_3`, потому что
+адресация sparse-блоков описывает tiled-раскладку. Это был единственный
+путь из vkd3d в отказ 0004, который и закрывал вопрос «нужен ли патч
+vkd3d для планарной ветки» (разделы 4 и 6).
+
+### 18.2 Почему тайлинг снимать не нужно
+
+Аргумент от чтения кода, потом подтверждённый измерением:
+
+- `tu_image_view_init` переинтерпретирует плоскость 0 NV12 как Y8/R8,
+  и комментарий в коде называет причиной отличие **сжатия**: «the 0'th
+  plane of this format has a different UBWC compression». То есть сама
+  переинтерпретация определена как тождественная по раскладке.
+- Раскладка строится ровно тем же форматом: `tu6_plane_format()` отдаёт
+  для плоскости 0 `PIPE_FORMAT_Y8_UNORM`, и он же уходит в
+  `tu_image_init`. У плоскости 1 базовый формат совпадает (`R8_UNORM` /
+  `PIPE_FORMAT_R8_UNORM`).
+
+Меняется только то, чем сжаты данные, а не геометрия плоскостей. Значит
+`ubwc_enabled = false` достаточно, а отдельный запрет на tiling — нет.
+
+### 18.3 Измерение
+
+Проба **N** в `rp6-vkd3d-sparse-test.c`. Ключевая строка — N2, create
+NV12 + MUTABLE + SPARSE_RESIDENCY:
+
+| сборка | N2 | N1 (без MUTABLE) |
+|---|---|---|
+| сток 26.2.3 | SUCCESS | SUCCESS |
+| 0004–0008 | `FEATURE_NOT_PRESENT` | SUCCESS |
+| 0004–0008 + **0009** | **SUCCESS** | SUCCESS |
+
+Логи: `results/test-nv12-linear-patched.log` (0004–0008) и
+`results/test-nv12-keep-tiling.log` (+0009).
+
+Признак независимый от вычисления размера: гейт в `tu_image.cc` отказывает
+ровно при `tile_mode != TILE6_3`, поэтому `SUCCESS` на N2 означает TILE6_3
+напрямую, без интерпретации memreq.
+
+### 18.4 Ошибка проб�� W, исправленная по ходу
+
+Проба W была задумана как решающая и **свою задачу не выполнила**: она
+печатала «linear NV12 128x128 would be 0x6000» и на стоке, и на 0009
+выдавала `memreq 0x6000`. Значит tiled без UBWC даёт ровно столько же,
+и по этому числу линейность от tiled не отличить. Подпись была ложным
+доказательством; в тесте она заменена на явное предупреждение, а
+вердикт W заменён на нейтральные справочные числа.
+
+Вторая причина, зафиксированная в коде: чтение «плоскость 0 через
+R8_UNORM-вид» копированием **невыразимо** — `vkCmdCopyImageToBuffer`
+принимает `VkImage`, а не `VkImageView`, так что transfer вообще не
+различает виды. Полное доказательство потребовало бы шейдера,
+сэмплирующего R8-вид; это отдельная работа, она не сделана и в выводе
+не использована.
+
+### 18.5 Итог
+
+- **vkd3d патчить не нужно.** Единственный достижимый из vkd3d путь в отказ
+  0004 закрыт со стороны драйвера.
+- NV12 + MUTABLE перестаёт быть линейным. Для видео это обычная
+  конфигурация, и демоция стоила полосы и тайлинга.
+- Правка не в гейте по чипу, а в общем коде, поэтому кандидат в апстрим:
+  отдельной правкой `tu_image.cc` без quirk-гейта.
+- Откат: `git apply -R patches/0009-turnip-nv12-mutable-keep-tiling.patch`.
+  Нужен инкрементальный `scripts/rebuild-turnip-msm.sh`, **но** с образом
+  `mesa-build-fedora44-wsi-glslang`, а не `mesa-build-fedora44-full`
+  (раздел 19).
+## 19. Образ сборки: `mesa-build-fedora44-full` устарел
+
+### 19.1 Симптом
+
+Инкрементальная пересборка (`scripts/rebuild-turnip-msm.sh`) падала на
+линковке, перечисляя отсутствующие библиотеки одну за другой:
+
+```
+ninja: error: '/usr/lib64/libX11-xcb.so', needed by
+  'src/freedreno/vulkan/libvulkan_freedreno.so', missing and no known rule
+```
+
+### 19.2 Причина
+
+`docs/analysis.md` предписывает делать образ через
+`podman commit mesa localhost/mesa-build-fedora44-full` — образ не
+пересобирается, а `commit` фиксирует контейнер в том состоянии, в каком он
+оказался. Измеренное содержимое:
+
+| образ | дата | из 6 WSI-devel пакетов |
+|---|---|---|
+| `mesa-build-fedora44-full` | 27.09 | **0** |
+| `mesa-build-fedora44-wsi-glslang` | 29.09 | **6** |
+
+Все шесть пакетов (`libxcb-devel libX11-devel libXrandr-devel
+libxshmfence-devel xcb-util-keysyms-devel wayland-devel`) прописаны в
+`container/Containerfile.mesa-build` явно, вместе с пояснением про
+регистр имён. То есть **документация верна — образ просто отстал от неё**:
+коммит сделан до того, как в Containerfile добавили блок WSI.
+
+Почему ловилось не сразу: полная пересборка (`scripts/build-turnip.sh` с
+`rm -rf build`) создаёт каталог заново, и `meson setup` находит зависимости
+сам. Инкрементальная пересборка переиспользует существующий `build/`, где
+meson уже записал абсолютные пути вида `/usr/lib64/libX11-xcb.so`. Эти пути
+никуда не делись, а пакетов в образе нет.
+
+### 19.3 Что делать
+
+Брать `localhost/mesa-build-fedora44-wsi-glslang` для любой пересборки.
+Либо пересобрать образ из `container/Containerfile.mesa-build`, чтобы он
+не мог разойтись с Containerfile снова.
+
+Отдельно: `podman run --rm` съедает установленное, поэтому «поставить
+пакеты один раз в образ» не работает в принципе — если образ не пересобран,
+зависимости ставятся в том же прогоне. И `dnf` откатывает **всю**
+транзакцию при любом неверном имени пакета, молча уходя в `>/dev/null`,
+так что список должен быть точным (в Fedora это `libXrandr-devel`, а не
+`libxrandr-devel`; `libxcb-present` и подобных нет — всё в
+`libxcb-devel`).
+
+### 19.4 Что замеряли
+
+| пакет | `-full` | `-wsi-glslang` |
+|---|---|---|
+| `libX11-devel` | нет | есть |
+| `libXrandr-devel` | нет | есть |
+| `libxshmfence-devel` | нет | есть |
+| `xcb-util-keysyms-devel` | нет | есть |
+| `libxcb-devel` | нет | есть |
+| `wayland-devel` | нет | есть |
+
+Проверка одной командой:
+
+```sh
+podman run --rm localhost/<образ> bash -c \
+  'for p in libX11-devel libXrandr-devel libxshmfence-devel \
+           xcb-util-keysyms-devel libxcb-devel wayland-devel; do
+     rpm -q $p >/dev/null 2>&1 && echo "есть $p" || echo "НЕТ  $p"
+   done'
+```
+
+Регистр в `rpm -q` важен: `libxrandr-devel` вернёт «нет» даже там, где
+пакет установлен — имя `libXrandr-devel`.

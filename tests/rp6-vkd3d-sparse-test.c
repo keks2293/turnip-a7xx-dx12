@@ -480,6 +480,231 @@ static int compare_words(const uint32_t *got, const uint32_t *want, uint32_t w, 
 /* Behavior probe for an image that may have been force-lined by the
  * mutable-format logic (E/F): bind one granule, read the whole image back
  * via transfer, classify the pixels. */
+/* W. NV12 plane-0 reinterpretation on a MUTABLE image.
+ *
+ * The claim under test: for a planar base format, MUTABLE changes only the
+ * *compression*, not the layout. tu_image_view_init maps an R8_UNORM view of
+ * PLANE_0 straight back to PIPE_FORMAT_Y8_UNORM (the NV12-specific case,
+ * "The 0'th plane of this format has a different UBWC compression"), and that
+ * is exactly the format the plane-0 layout was built with (tu6_plane_format ->
+ * PIPE_FORMAT_Y8_UNORM, passed to the layout in tu_image_init). If so, then
+ * `ubwc_enabled = false` alone is sufficient in the NV12 branch and
+ * `force_linear_tile = true` is redundant - which would also let a sparse
+ * NV12+MUTABLE image stay tiled and be creatable.
+ *
+ * Measured: fill both planes by transfer with position-dependent patterns
+ * (different per plane, so a plane mix-up is visible), then read PLANE_0 back
+ * twice - as NV12 straight off the image, and through an R8_UNORM view of
+ * PLANE_0 - and compare both against the fill. A layout or stride mistake
+ * cannot survive a byte-exact comparison against a position-dependent fill.
+ * The readback goes through the texture path (TPL1_A2D_SRC uses the view's
+ * descriptor and its swap), so this is not a pure copy self-consistency test. */
+static void probe_nv12_plane0(VkDevice dev, VkQueue q, VkCommandPool pool, const char *tag)
+{
+    const uint32_t w = 128, h = 128;              /* plane0 = 128x128 Y8 */
+    const VkDeviceSize p0 = (VkDeviceSize)w * h;
+    const VkDeviceSize p1 = (VkDeviceSize)(w / 2) * (h / 2) * 2;
+    VkImage img = VK_NULL_HANDLE;
+
+    VkImageCreateInfo iic = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
+        .extent = { w, h, 1 },
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                 VK_IMAGE_USAGE_SAMPLED_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
+    };
+    VkResult rc = vkCreateImage(dev, &iic, NULL, &img);
+    printf("  %s: vkCreateImage(NV12 MUTABLE, no list): %s\n", tag, vkerr(rc));
+    if (rc != VK_SUCCESS)
+        return;
+
+    VkMemoryRequirements mr;
+    vkGetImageMemoryRequirements(dev, img, &mr);
+    /* ВНИМАНИЕ: memreq здесь НЕ признак линейности. Подпись ниже раньше
+     * утверждала, что 0x6000 — это линейный NV12 128x128, но измерением
+     * (patch 0009) оказалось, что tiled без UBWC даёт ровно столько же, так
+     * что по этому числу линейное от tiled не отличить.
+     *
+     * Признак ровно один, и он в пробе N: гейт tu_image.cc отказывает
+     * sparse-образу при tile_mode != TILE6_3, поэтому SUCCESS на N2 означает
+     * TILE6_3 напрямую. Не возвращайтесь к чтению этого числа как к
+     * доказательству раскладки - оба состояния дают 0x6000. */
+    printf("  %s: memreq size=0x%llx (НЕ признак linear: tiled без UBWC даёт столько же)\n",
+           tag, (unsigned long long)mr.size);
+
+    VkDeviceMemory im = VK_NULL_HANDLE;
+    if (alloc_mem(dev, mr.size, 0, &im) != VK_SUCCESS ||
+        vkBindImageMemory(dev, img, im, 0) != VK_SUCCESS) {
+        printf("  %s: image memory bind failed\n", tag);
+        return;
+    }
+
+    /* One host-visible buffer, used for staging both planes and for the two
+     * readbacks: p0 bytes of fill, then p1, then readback A, then readback B. */
+    VkBufferCreateInfo bci = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, NULL, 0, p0 + p1 + 2 * p0,
+                               VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                               VK_SHARING_MODE_EXCLUSIVE, 0, NULL };
+    VkBuffer buf;
+    if (vkCreateBuffer(dev, &bci, NULL, &buf) != VK_SUCCESS) {
+        printf("  %s: staging buffer create failed\n", tag);
+        return;
+    }
+    VkMemoryRequirements br;
+    vkGetBufferMemoryRequirements(dev, buf, &br);
+    VkDeviceMemory bm = VK_NULL_HANDLE;
+    if (alloc_mem(dev, br.size, 0, &bm) != VK_SUCCESS ||
+        vkBindBufferMemory(dev, buf, bm, 0) != VK_SUCCESS) {
+        printf("  %s: staging memory bind failed\n", tag);
+        return;
+    }
+    unsigned char *host;
+    chk(vkMapMemory(dev, bm, 0, br.size, 0, (void **)&host), "map W staging");
+
+    /* fill: plane 0 (x^y^0x5A), plane 1 (x^y^0xA5 - deliberately different so
+     * a read that lands on the wrong plane cannot pass) */
+    for (uint32_t y = 0; y < h; y++)
+        for (uint32_t x = 0; x < w; x++)
+            host[(size_t)y * w + x] = (unsigned char)(x ^ y ^ 0x5A);
+    for (uint32_t y = 0; y < h / 2; y++)
+        for (uint32_t x = 0; x < w / 2; x++)
+            host[p0 + ((size_t)y * (w / 2) + x) * 2 + 0] = (unsigned char)(x ^ y ^ 0xA5);
+    for (uint32_t i = 0; i < p0; i++)
+        host[p0 + p1 + i] = 0xCC;
+    for (uint32_t i = 0; i < p0; i++)
+        host[p0 + p1 + p0 + i] = 0xCC;
+    vkUnmapMemory(dev, bm);
+
+    /* Этот блок НЕ доказывает тождественность раскладок и не должен читаться
+     * как доказательство: он сравнивает два наблюдения, которые совпадают при
+     * любом тайлинге, потому что vkGetImageSubresourceLayout сообщает размер
+     * и ряд строки, а не способ хранения. Оба состояния (linear и tiled без
+     * UBWC) дают здесь offset=0 size=16384 rowPitch=128 - это подтверждено
+     * измерением на стоке и на 0009.
+     *
+     * Настоящий признак - поведение гейта в пробе N, а здесь остаётся
+     * только проверка, что плоскость 0 переживает round trip.
+     *
+     * Заодно зафиксировано ограничение API, из-за которого чтение "через
+     * view" копированием невозможно: vkCmdCopyImageToBuffer принимает
+     * VkImage, а не VkImageView, так что transfer вообще не различает виды.
+     * Полное доказательство потребовало бы шейдера, сэмплирующего R8-вид. */
+    VkImageCreateInfo iir = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = VK_FORMAT_R8_UNORM,
+        .extent = { w, h, 1 },
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+    VkImage img_r8 = VK_NULL_HANDLE;
+    VkSubresourceLayout l_nv12 = { 0 }, l_r8 = { 0 };
+    VkImageSubresource sub_p0 = { VK_IMAGE_ASPECT_PLANE_0_BIT, 0, 0 };
+    VkImageSubresource sub_c = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
+    int have_layout = 0;
+
+    if (vkCreateImage(dev, &iir, NULL, &img_r8) == VK_SUCCESS) {
+        /* returns void in Vulkan: no failure path to check. Note the argument
+         * order - pSubresource comes before pLayout. */
+        vkGetImageSubresourceLayout(dev, img, &sub_p0, &l_nv12);
+        vkGetImageSubresourceLayout(dev, img_r8, &sub_c, &l_r8);
+        have_layout = 1;
+    }
+    if (have_layout) {
+        /* Печатаются как справочные значения, без вывода: обе раскладки
+         * совпадают и при linear, и при tiled (измерение на стоке и 0009),
+         * поэтому равенство здесь ничего не различает. */
+        printf("  %s: PLANE_0 of NV12   : offset=%llu size=%llu rowPitch=%llu arrayPitch=%llu\n", tag,
+               (unsigned long long)l_nv12.offset, (unsigned long long)l_nv12.size,
+               (unsigned long long)l_nv12.rowPitch, (unsigned long long)l_nv12.arrayPitch);
+        printf("  %s: R8_UNORM образ   : offset=%llu size=%llu rowPitch=%llu arrayPitch=%llu\n", tag,
+               (unsigned long long)l_r8.offset, (unsigned long long)l_r8.size,
+               (unsigned long long)l_r8.rowPitch, (unsigned long long)l_r8.arrayPitch);
+        int same = l_nv12.offset == l_r8.offset && l_nv12.size == l_r8.size &&
+                   l_nv12.rowPitch == l_r8.rowPitch && l_nv12.arrayPitch == l_r8.arrayPitch;
+        printf("  %s: раскладки %s (признаком linear/tiled не является, см. комментарий)\n", tag,
+               same ? "совпадают" : "различаются");
+    } else {
+        printf("  %s: не удалось получить subresource layout\n", tag);
+    }
+
+    /* Data check that the copy path *can* express: plane 0 must survive a
+     * buffer->image->buffer round trip. This does not involve any view, so it
+     * validates the layout rather than the reinterpretation. */
+    VkCommandBuffer cb;
+    VkCommandBufferAllocateInfo cai = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, NULL, pool,
+                                        VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1 };
+    vkAllocateCommandBuffers(dev, &cai, &cb);
+    VkCommandBufferBeginInfo bbi = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, NULL,
+                                     VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, NULL };
+    vkBeginCommandBuffer(cb, &bbi);
+
+    VkImageMemoryBarrier to_dst = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, NULL, 0,
+                                    VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0, img,
+                                    { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 2 } };
+    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                         0, NULL, 0, NULL, 1, &to_dst);
+    VkBufferImageCopy c0 = { 0, 0, 0, { VK_IMAGE_ASPECT_PLANE_0_BIT, 0, 0, 1 }, { 0, 0, 0 }, { w, h, 1 } };
+    VkBufferImageCopy c1 = { p0, 0, 0, { VK_IMAGE_ASPECT_PLANE_1_BIT, 0, 0, 1 }, { 0, 0, 0 },
+                            { w / 2, h / 2, 1 } };
+    vkCmdCopyBufferToImage(cb, buf, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 2,
+                           (VkBufferImageCopy[]){ c0, c1 });
+
+    VkImageMemoryBarrier to_src = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, NULL,
+                                    VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0, img,
+                                    { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 2 } };
+    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                         0, NULL, 0, NULL, 1, &to_src);
+    VkBufferImageCopy r0 = { p0 + p1, 0, 0, { VK_IMAGE_ASPECT_PLANE_0_BIT, 0, 0, 1 }, { 0, 0, 0 },
+                             { w, h, 1 } };
+    vkCmdCopyImageToBuffer(cb, img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buf, 1, &r0);
+    vkEndCommandBuffer(cb);
+    VkSubmitInfo si = { VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, NULL, 1, &cb, 0, NULL };
+    vkQueueSubmit(q, 1, &si, NULL);
+    vkQueueWaitIdle(q);
+    vkFreeCommandBuffers(dev, pool, 1, &cb);
+
+    chk(vkMapMemory(dev, bm, 0, br.size, 0, (void **)&host), "remap W staging");
+    unsigned bad = 0;
+    uint32_t first = 0;
+    for (uint32_t i = 0; i < p0; i++) {
+        unsigned char want = (unsigned char)((i % w) ^ (i / w) ^ 0x5A);
+        if (host[p0 + p1 + i] != want) {
+            if (!bad)
+                first = i;
+            bad++;
+        }
+    }
+    printf("  %s: PLANE_0 round trip: %s", tag, bad ? "MISMATCH" : "byte-exact vs fill");
+    if (bad)
+        printf(" (%u/%u bytes, first at %u: got 0x%02x want 0x%02x)", bad, (unsigned)p0, first,
+               host[p0 + p1 + first], (unsigned char)((first % w) ^ (first / w) ^ 0x5A));
+    printf("\n");
+    vkUnmapMemory(dev, bm);
+
+    if (img_r8)
+        vkDestroyImage(dev, img_r8, NULL);
+    vkDestroyBuffer(dev, buf, NULL);
+    vkFreeMemory(dev, bm, NULL);
+    vkFreeMemory(dev, im, NULL);
+    vkDestroyImage(dev, img, NULL);
+}
+
 static void probe_linear_sparse(VkDevice dev, VkQueue q, VkCommandPool pool, VkImage img, const char *tag)
 {
     uint32_t sc = 0;
@@ -1384,6 +1609,17 @@ skip_b:
                    both_fail, create_fail, ok);
         }
     }
+
+    /* W. NV12 + MUTABLE with tiling kept - the driver-side alternative to the
+     * one-line vkd3d fix for the planar branch (N2). On the stock tree the
+     * NV12 branch sets force_linear_tile, so this image is linear and the
+     * readback below is the *control* that tells us whether "keep tiling,
+     * drop UBWC only" is even a different thing to measure. */
+    /* Заголовок без слова "как R8_UNORM": чтения через view не существует,
+     * transfer принимает VkImage и виды не различает (см. комментарий в теле
+     * пробы). Признак тайлинга - N2, а не эта проба. */
+    printf("\n=== W. NV12 + MUTABLE: раскладка плоскости 0 и round trip ===");
+    probe_nv12_plane0(dev, q, pool, "W");
 
     /* G0. Format-query side of the E/F hole (P1): the query must refuse
      * SPARSE_RESIDENCY for the same mutable lists that force linear tiling.
