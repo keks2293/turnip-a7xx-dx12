@@ -1,0 +1,15 @@
+diff --git a/src/freedreno/vulkan/tu_image.cc b/src/freedreno/vulkan/tu_image.cc
+--- a/src/freedreno/vulkan/tu_image.cc
++++ b/src/freedreno/vulkan/tu_image.cc
+@@ -576,7 +576,10 @@
+                      util_format_name(vk_format_to_pipe_format(image->vk.format)),
+                      fmt_list ? "present" : "missing");
+                }
+-               ubwc_enabled = false;
++               /* EXPERIMENT E - NOT FOR COMMIT: keep UBWC on for this list
++                * while leaving is_mutable false (MUTABLEEN = 0).
++                */
++               // ubwc_enabled = false;
+             }
+ 
+             bool r8g8_r16 = tu6_format_list_reinterprets_r8g8_r16(vk_format_to_pipe_format(image->vk.format), fmt_list);

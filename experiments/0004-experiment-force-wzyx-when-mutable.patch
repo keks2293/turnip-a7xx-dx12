@@ -1,0 +1,14 @@
+diff --git a/src/freedreno/fdl/fd6_format_table.c b/src/freedreno/fdl/fd6_format_table.c
+index 009206dee7c..16931c04b0b 100644
+--- a/src/freedreno/fdl/fd6_format_table.c
++++ b/src/freedreno/fdl/fd6_format_table.c
+@@ -393,7 +393,8 @@ fd6_pipe2swap(enum pipe_format format, enum a6xx_tile_mode tile_mode,
+     * other hand, always respects swap.  We should return WZYX such that CCU
+     * and TP agree each other.
+     */
+-   if (tile_mode && !is_mutable)
++   /* EXPERIMENT D - NOT FOR COMMIT: the hack also applies when is_mutable. */
++   if (tile_mode)
+       return WZYX;
+ 
+    return formats[format].swap;

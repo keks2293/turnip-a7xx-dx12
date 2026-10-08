@@ -1,8 +1,7 @@
 diff --git a/src/freedreno/vulkan/tu_image.cc b/src/freedreno/vulkan/tu_image.cc
-index 8a109e16b58..0efc434dfdf 100644
 --- a/src/freedreno/vulkan/tu_image.cc
 +++ b/src/freedreno/vulkan/tu_image.cc
-@@ -470,6 +470,17 @@ tu_image_init(struct tu_device *device, struct tu_image *image,
+@@ -470,6 +470,17 @@
     bool ubwc_enabled = true;
     bool force_linear_tile = false;
     bool is_mutable = false;
@@ -20,29 +19,3 @@ index 8a109e16b58..0efc434dfdf 100644
     /* Force to either use tiled layout or linear for all mip layers. */
     bool force_disable_linear_fallback = false;
  
-@@ -527,10 +538,10 @@ tu_image_init(struct tu_device *device, struct tu_image *image,
-     * Depth and stencil formats cannot be reintepreted as another format, and
-     * cannot be linear with sysmem rendering, so don't fall back for those.
-     *
--    * TODO:
--    * - if the fmt_list contains only formats which are swapped, but compatible
--    *   with each other (B8G8R8A8_UNORM and B8G8R8A8_UINT for example), then
--    *   tiling is still possible
-+    * A list which is swapped but describes the stored words the same way
-+    * (B8G8R8A8_UNORM together with B8G8R8A8_UINT, say) does keep the tiled
-+    * layout: one layout describes every format of such a list, see
-+    * tu6_format_list_swaps_are_uniform().
-     */
-    if ((pCreateInfo->flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
-        !vk_format_is_depth_or_stencil(image->vk.format)) {
-@@ -582,7 +593,9 @@ tu_image_init(struct tu_device *device, struct tu_image *image,
-             bool r8g8_r16 = tu6_format_list_reinterprets_r8g8_r16(vk_format_to_pipe_format(image->vk.format), fmt_list);
-             bool fmt_list_has_swaps = tu6_format_list_has_swaps(fmt_list);
- 
--            if (r8g8_r16 || fmt_list_has_swaps) {
-+            if (r8g8_r16 ||
-+                (fmt_list_has_swaps &&
-+                 !tu6_format_list_swaps_are_uniform(fmt_list))) {
-                ubwc_enabled = false;
-                force_linear_tile = true;
-             }
