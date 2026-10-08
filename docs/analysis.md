@@ -356,15 +356,90 @@ scripts/run-test.sh .../freedreno_icd.json      results/test-patched.log
 `VK_LOADER_DEBUG=all` (нашёл ли загрузчик ICD), `objdump -p | grep NEEDED` и
 `nm -D --undefined-only | grep drmGetVersion` (скомпилирован ли msm-KMD).
 
-### Последствие, которое ещё не проверено
+### Где 0004 превращается в отказ для vkd3d
 
-Три пробы, которые на стоке создавались успешно, с патчами отклоняются:
-E (`{RGBA8, BGRA8}`), F (NULL-список) и B (NULL-список, R32_UINT). Это по
-замыслу 0004 — тихо читать не то хуже, чем отказать. Но vkd3d ставит
-`MUTABLE_FORMAT_BIT` широко и **не всегда** с format list, поэтому нужно
-отдельно проверить, как vkd3d реагирует на `VK_ERROR_FEATURE_NOT_PRESENT` при
-создании ресурса: упадёт ли игра или перейдёт на другой путь. Это первое, что
-стоит проверить на Resident Evil 4.
+Отказ корректен, но у vkd3d нет деградации: `resource.c:1207` при неудаче
+`vkCreateImage` пишет WARN и возвращает HRESULT наружу, без ретрая и без
+перехода на другой путь. Поэтому важно, какой именно набор комбинаций реально
+недостижим.
+
+Разбор `vkd3d_get_format_compatibility_list` (`resource.c`):
+
+- **обычные форматы** — список всегда есть, готовый
+  `device->format_compatibility_lists[Format]`, и для typeless-32-bit
+  дополнительно `R32_{UINT,SINT,SFLOAT}` (D3D11 spec 5.3.9.5). `MUTABLE_FORMAT_BIT`
+  ставится только после `if (list->format_count < 2) return false;`, то есть
+  MUTABLE и список идут в связке: нет списка — нет и MUTABLE. Конфликта нет.
+- **ветка с обнулённым списком** (`resource.c:826-827`, MUTABLE при
+  `memset(compat_list, 0, ...)`) требует `DISABLE_UAV_COMPRESSION` /
+  `DISABLE_COLOR_COMPRESSION` / `DISABLE_SIMULTANEOUS_UAV_COMPRESSION` —
+  по умолчанию выключена, в обычной игре не встречается.
+- **планарные форматы** — единственный случай по умолчанию, где MUTABLE
+  ставится без списка:
+  ```c
+  if (format->vk_aspect_mask & VK_IMAGE_ASPECT_PLANE_0_BIT) {
+      *vk_flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+      return false;
+  }
+  ```
+
+Соединяется это с тем, что `sparse_resource = !heap_properties`
+(`resource.c:732`): все `CreateReservedResource` (`resource.c:4916` передаёт
+`NULL`) и любой `CreateCommittedResource` без heap получают
+`SPARSE_BINDING|RESIDENCY|ALIASED`. Итог: **NV12 на default/reserved heap**
+даёт MUTABLE + SPARSE + без списка, то есть ровно отказ 0004.
+
+### NV12: измерено, изоляция работает
+
+Проба **N** (добавлена в тест) — планарный NV12 с sparse, с MUTABLE и без:
+
+| | сток | 0004–0006 |
+|---|---|---|
+| N1: NV12 + sparse, **без** MUTABLE | SUCCESS | **SUCCESS** |
+| N2: NV12 + sparse, **с** MUTABLE | SUCCESS | `FEATURE_NOT_PRESENT` |
+| N3: query NV12 + sparse, оба варианта | `FORMAT_NOT_SUPPORTED` | `FORMAT_NOT_SUPPORTED` |
+
+N1 — то самое предсказание, подтверждённое измерением: без MUTABLE ветка
+«NV12 всегда linear» не выполняется вовсе, `force_linear_tile` не ставится,
+`tile_mode` остаётся `TILE6_3`. Что это именно tiled, а не linear, следует из
+самого 0004: он отказывает любому sparse-образу с `tile_mode != TILE6_3`,
+поэтому на запатченном драйвере успешный sparse-create не может быть линейным.
+
+N3 — не регрессия: то же `FORMAT_NOT_SUPPORTED` есть и на стоке, причина
+в апстриме (`tu_formats.cc:730-732`, `/* Don't support multi-planar formats with
+sparse yet */`). Внутри драйвера тут расхождение — create разрешает, query
+отказывает, — но на vkd3d оно не влияет: `utils.c:686` возвращается раньше
+запроса для планарных форматов («Planar and depth-stencil formats do not
+support sparse in D3D12»).
+
+**Вывод: MUTABLE и SPARSE не обязаны сочетаться, и развязка — одна строка в
+vkd3d.** MUTABLE для планарных функционально не нужен, это признаёт сам
+комментарий рядом с ним: «Just be conservative here». Предлагаемая правка:
+
+```c
+if (format->vk_aspect_mask & VK_IMAGE_ASPECT_PLANE_0_BIT) {
+    if (!sparse_resource)                 /* NV12 + sparse всё равно linear */
+        *vk_flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+    return false;
+}
+```
+
+Ослаблять 0004 под это **не надо**: NULL-список означает, что приложение может
+переинтерпретировать в любой совместимый формат, и доказать безопасность по
+такому списку нельзя в принципе — хелпер прямо говорит «presumably one would
+have the swap set». Развязка должна быть на стороне vkd3d.
+
+### Что осталось не проверено
+
+Пробы E (`{RGBA8, BGRA8}`), F и B (NULL-список) с патчами отклоняются — по
+замыслу 0004. Для NULL-списка и для планарных путь найден и описан выше.
+Остаётся проверить, дойдёт ли до отказа **список, который vkd3d строит
+сам** — то есть несовместимый по compat-типам типизированный список (не
+B8G8R8A8-семейство, которое закрывает 0006). Такие списки образуются
+объединением форматов одного typeless-ресурса, и если такой список
+пересекается с `SPARSE_RESIDENCY`, игра получит отказ. Это первое, что стоит
+проверить на Resident Evil 4, и для этого нужен не только драйвер, но и
+лог vkd3d (`VKD3D_CONFIG=warn` / `VKD3D_DEBUG=log`).
 
 ## 7. Подмена драйвера на устройстве
 
