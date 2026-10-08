@@ -1575,3 +1575,43 @@ MUTABLE `{BGRA8, RGBA8}`: заполнение, чтение базовым BGRA
 «кросс-порядковый tiled+UBWC» HW механически достижим, но наблюдаемая
 семантика кросс-вида не равна стоковой/линейной → не включать. S3 остаётся
 в тесте как контроль этой границы.
+
+## 17. Замер памяти RE4 (30.09)
+
+Методика: прогон `scripts/run-game.sh patched 150` с
+`VKD3D_CONFIG=log_memory_budget VKD3D_DEBUG=info VKD3D_LOG_FILE=...`
+(vkd3d печатает каждую аллокацию: размер + нарастающий итог по
+memory-типам, после каждой — отчёт `Memory heap #0 ... usage` из
+VK_EXT_memory_budget), `TU_DEBUG=bos` (топ живых BO turnip; печатается
+после каждого submit, поэтому сырые 4 215 096 строк / 242 МБ остались
+в results/raw/, в git — только последний дамп) и MangoHud CSV
+(`ram_used`/`swap_used`). Артефакты: `results/vkd3d-mem.log`,
+`results/game-patched-mem.log`, `results/fps-at-mem.csv`.
+
+### Цифры
+
+| источник | итог |
+|---|---|
+| vkd3d: пик / конец | 3129 MiB / 3108 MiB (720 аллокаций) |
+| бюджет | драйвер объявляет budget 2672 MiB при usage 3122 MiB — non-budgeted-путь vkd3d его обходит |
+| топ vkd3d | чанки 16 MiB ×66 = 1056 MiB (VA-чанки под мелкие буферы), парные кучи 187500 KiB ×2 и 133640 KiB ×2, далее 128/50/42.7 MiB |
+| turnip: живые BO | 3490 MiB, внутренности ~370 MiB |
+| — `pipeline_suballoc` | 1798 BO = 225 MiB |
+| — `pvtmem` | ×3 = 120 MiB (fiber/wave private memory, рост степенями двойки, tu_shader.cc:2871) |
+| — `embedded samplers` | 3025 BO = 12 MiB |
+| система | `ram_used` mean 6.76 / max 7.24 из 7.32 GiB, `swap_used` max 4.95 GiB |
+
+### Выводы
+
+1. Главный объём — ресурсы самой игры (≈3 ГиБ): единственный крупный
+   рычаг — настройки текстуры/качества в игре.
+2. Внутренности драйвера ~370 MiB вторичны; `pipeline_suballoc` и
+   `pvtmem` — области, где уменьшение возможно только правкой драйвера
+   (`pvtmem` задаётся требованиями шейдеров, силой не режется).
+3. env-рычагов памяти нет — подтверждение §15: весь env не двигает ни
+   FPS, ни footprint. `VKD3D_SWAPCHAIN_IMAGES=2` (свопчейн по умолчанию
+   `max(3,minImageCount)`, swapchain.c:2207) даёт единицы МБ.
+4. Система живёт подзапячкой (swap max 4.95 ГиБ при sum ≈ 10 ГиБ);
+   swappiness=180/zram — только с root, вне контура проекта.
+5. `TU_DEBUG=bos` при повторных замерах не использовать: дамп после
+   каждого submit = 242 МБ лога.
