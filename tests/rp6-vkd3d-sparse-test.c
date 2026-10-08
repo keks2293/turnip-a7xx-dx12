@@ -59,7 +59,7 @@
  *   ./rp6-vkd3d-sparse-test
  * To run against a patched Turnip, bind-mount it over the packaged one --
  * never modify files under /usr: that breaks install verification and
- * surfaces later, as damage, after a system update (rp6-vkd3d-analysis.md
+ * surfaces later, as damage, after a system update (docs/analysis.md
  * section 7). A mount point dies with the boot, so a reboot is the cleanup.
  *
  * Observed on stock Mesa 26.2.2 / A740 (20-21.09.2026). Every result below is
