@@ -67,15 +67,17 @@ cp -v "$SO" /out/out/
 # По умолчанию - как в scripts/env.sh; переопределяется снаружи.
 DEVICE_SO="${RP6_DEVICE_SO:-/var/home/armada/opencode/build/out/libvulkan_freedreno.so}"
 # api_version и file_format_version - как у пакетного драйвера образа
-# (mesa-vulkan-drivers): загрузчик на устройстве 1.4.341. Занижать api_version
-# до "1.3" не нужно: DXVK сам просит VK_API_VERSION_1_3, но несовпадение
-# манифеста с тем, что реально объявляет драйвер, - лишний повод для расхождений.
+# (mesa-vulkan-drivers). Раньше здесь стояло 1.4.341, но пакетный манифест на
+# устройстве (/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json) объявляет
+# 1.4.354 - ровно ту же версию, что и сам драйвер (vulkaninfo: apiVersion =
+# 1.4.354). Занижать api_version до "1.3" не нужно: DXVK сам просит
+# VK_API_VERSION_1_3.
 cat > /out/out/freedreno_icd.json <<EOF
 {
     "file_format_version": "1.0.1",
     "ICD": {
         "library_path": "$DEVICE_SO",
-        "api_version": "1.4.341",
+        "api_version": "1.4.354",
         "library_arch": "64"
     }
 }
