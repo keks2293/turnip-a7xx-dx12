@@ -1,2 +1,2 @@
-FROM localhost/mesa-build-fedora44
+FROM localhost/mesa-build-fedora44-full
 RUN dnf -y install glslang-tools && dnf clean all
