@@ -7,6 +7,9 @@
 #   scripts/run-game.sh patched [sec]   # патченый драйвер из build/out
 #   scripts/run-game.sh stock           # пакетный драйвер из /usr/lib64
 #
+# TAG=trace задаёт суффикс логов (game-patched-trace.log): без него каждый
+# прогон затирает предыдущий, а логи разных прогонов нужны одновременно.
+#
 # Драйвер подсовывается загрузчику через VK_DRIVER_FILES: /usr трогать нельзя,
 # sudo требует пароль (docs/analysis.md, раздел 7).
 set -euo pipefail
@@ -41,8 +44,9 @@ esac
 # шума wine/FEX, которые не говорят ничего о причине. В git идёт отфильтрованный
 # results/game-<mode>.log, собранный scripts/curate-game-log.sh.
 mkdir -p "$REPO/results/raw"
-RAW="$REPO/results/raw/game-$MODE.log"
-LOG="$REPO/results/game-$MODE.log"
+SUFFIX="${TAG:+-$TAG}"
+RAW="$REPO/results/raw/game-$MODE$SUFFIX.log"
+LOG="$REPO/results/game-$MODE$SUFFIX.log"
 CURATE="$REPO/scripts/curate-game-log.sh"
 
 export STEAM_COMPAT_DATA_PATH="$PREFIX"
@@ -104,7 +108,7 @@ echo "код возврата: $RC"
 # Копия лога proton (PROTON_LOG=1) — в raw: у части запусков он не создаётся,
 # поэтому копируем только существующие.
 for f in /tmp/proton-"${USER:-armada}"/*.log; do
-  [ -e "$f" ] && cp "$f" "$REPO/results/raw/proton-$MODE-$(basename "$f")"
+  [ -e "$f" ] && cp "$f" "$REPO/results/raw/proton-$MODE$SUFFIX-$(basename "$f")"
 done
 
 exit $RC
