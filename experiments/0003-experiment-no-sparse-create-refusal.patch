@@ -1,0 +1,57 @@
+Эксперимент: снимает ли 0004 отказ на create, из-за которого игра на 12_0
+показывает «GPU не подходит под минимальные требования».
+
+Наблюдение, которое мотивирует эксперимент: с патченым драйвером игра
+создаёт устройство на 12_0 (отказа 0xc000 больше нет), поднимает swapchain
+не успевает и показывает окно с отказом по требованиям, при этом лог чист —
+ни одного err: и ни одного Exception. Отказ 0004 возвращает
+VK_ERROR_FEATURE_NOT_PRESENT из tu_image_init для образа с
+SPARSE_RESIDENCY, который ушёл в linear (список совместимых форматов
+демотирует его), и это ровно тот код, который игра на 12_0 дёргает шире, чем
+на 11_1. Если после снятия отказа окно исчезнет и появится swapchain, причина
+найдена; если нет - отказ 0004 ни при чём, и искать надо в другом месте.
+
+Патч трогает ровно одну проверку. Снятие гейта (экспозиция
+sparseResidencyImage2D в tu_device.cc) остаётся - иначе нечего проверять.
+assert из апстрима не возвращаем: в release-сборке он активен и просто
+убил бы процесс, что не отличить от отказа.
+
+Ожидаемо, если гипотеза верна: игра создаёт образ, окно с требованиями
+исчезает, в логе появляется dxgi_vk_swap_chain_init.
+Ожидаемо, если гипотеза неверна: окно остаётся, поведение прогона не меняется.
+
+Прогон (сборка ~5 минут, игра 200 с):
+
+    cd /var/home/armada/opencode/build/mesa-rp6
+    git apply /var/home/armada/opencode/turnip-a7xx-dx12/experiments/0003-experiment-no-sparse-create-refusal.patch
+    podman run --rm -v $PWD:/src:Z -v /var/home/armada/opencode/build:/out:Z \
+      localhost/mesa-build-fedora44-wsi-glslang \
+      bash -c 'cd /src && ninja -C build -j4 src/freedreno/vulkan/libvulkan_freedreno.so \
+               && cp build/src/freedreno/vulkan/libvulkan_freedreno.so /out/out/'
+    scripts/run-game.sh patched 200
+
+Откат: git checkout src/freedreno/vulkan/tu_image.cc
+
+Лог: results/raw/game-patched-norefusal.log (вне git), отфильтрованный -
+results/game-patched-norefusal.log.
+
+diff --git a/src/freedreno/vulkan/tu_image.cc b/src/freedreno/vulkan/tu_image.cc
+index 8a109e16b58..fdc5c2bd52e 100644
+--- a/src/freedreno/vulkan/tu_image.cc
++++ b/src/freedreno/vulkan/tu_image.cc
+@@ -654,13 +656,9 @@ tu_image_init(struct tu_device *device, struct tu_image *image,
+    /* We cannot support sparse residency with linear images.  The sparse
+     * bookkeeping addresses the tiled layout, so a linear image created with
+     * SPARSE_RESIDENCY silently reads and writes the wrong places instead of
+-    * failing, and the format query cannot see the format list which demoted
+-    * us to linear.  Refuse the create.
++    * failing.  EXPERIMENT 0003: the refusal is removed on purpose, to see
++    * whether it is what makes the game refuse to start.  See experiments/.
+     */
+-   if (image->vk.create_flags & VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT) {
+-      if (tile_mode != TILE6_3)
+-         return vk_error(device, VK_ERROR_FEATURE_NOT_PRESENT);
+-   }
+ 
+    for (uint32_t i = 0; i < tu6_plane_count(image->vk.format); i++) {
+       struct fdl_layout *layout = &image->layout[i];
