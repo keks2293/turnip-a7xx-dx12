@@ -1519,17 +1519,22 @@ CSV: `results/fps-at-{offA,base6,offB,base7}.csv`, серия —
 `(True, True)` — как и было. Картинка для пары — скриншоты `gc-*`/`gcr8-*`
 из 15.3.
 
-## 16. mixed-swap (0006): tiled+UBWC для списка {BGRA8, RGBA8}
+## 16. mixed-swap (эксперимент cross-order): tiled+UBWC для {BGRA8, RGBA8}
+
+> Здесь и далее «эксперимент cross-order» — это **не патч 0006** (тот
+> добавляет `FD6_UBWC_B8G8R8A8_INT`, см. §5 и `patches/`), а отдельная
+> проба в `experiments/`. Изначально она была `0006-experiment-…`, из-за
+> чего путалась с патчем; номер убран, имя теперь говорит о сути.
 
 Остался один неиспользованный сценарий переинтерпретации: список форматов
 одинаковой геометрии блока, но разного порядка каналов — `{B8G8R8A8_UNORM,
 R8G8B8A8_UNORM}`. Контроль (сток и патчи 0004–0008): `swaps_are_uniform()`
 такой список отвергает → `tu_image_init()` выключает UBWC и принудительно
-кладёт образ в линей. Эксперимент 0006
-(`experiments/0006-experiment-cross-order-list-tiled-ubwc.patch`) вводит
+кладёт образ в линей. Эксперимент cross-order
+(`experiments/experiment-cross-order-list-tiled-ubwc.patch`) вводит
 признак `tu6_format_list_same_shape()` (все форматы списка — один и тот же
 texel-блок: каналы, биты, форма) и в mutable-ветке оставляет такому списку
-tiled+UBWC; sparse-запрос (`tu6_mutable_format_list_forces_linear`) 0006
+tiled+UBWC; sparse-запрос (`tu6_mutable_format_list_forces_linear`)
 намеренно не трогает.
 
 Проверка — новая проба **S3** в `rp6-vkd3d-sparse-test.c` (non-sparse
@@ -1540,7 +1545,7 @@ MUTABLE `{BGRA8, RGBA8}`: заполнение, чтение базовым BGRA
 |---|---|---|---|---|
 | сток 26.2.3 (`stock`) | 0x100000, линей | EXACT | identity (`== fill2`) | 0/262144 |
 | контроль 0004–0008 (`control`) | 0x100000, линей | EXACT | identity | 0/262144 |
-| 0006 (`ubwc`) | 0x102000, tiled+UBWC | EXACT | **swapped** (`b0<->b2`) | 0/262144 |
+| эксперимент (`ubwc`) | 0x102000, tiled+UBWC | EXACT | **swapped** (`b0<->b2`) | 0/262144 |
 | после отката (`postrev`) | 0x100000, линей | EXACT | identity | 0/262144 |
 
 Что из этого следует:
@@ -1569,12 +1574,58 @@ MUTABLE `{BGRA8, RGBA8}`: заполнение, чтение базовым BGRA
   `FORMAT_NOT_SUPPORTED` — create и query разошлись. `F` (NULL-список)
   не тронут, остальной вывод теста не изменился (`FAIL` те же 6 штук).
 
-Итог: откат `git apply -R experiments/0006-…`, пересборка драйвера,
-контрольный прогон байт-в-байт совпал с контролем (`postrev` ==
+Итог: откат `git apply -R experiments/experiment-cross-order-…`, пересборка
+драйвера, контрольный прогон байт-в-байт совпал с контролем (`postrev` ==
 `control`), файлы mesa-дерева сверены с бэкапом — идентичны. Вывод:
 «кросс-порядковый tiled+UBWC» HW механически достижим, но наблюдаемая
 семантика кросс-вида не равна стоковой/линейной → не включать. S3 остаётся
 в тесте как контроль этой границы.
+
+### 16.1. Кто вообще строит кросс-порядковые списки (проверено по коду)
+
+Отсутствие таких списков у vkd3d — не совпадение и не недоработка, а
+следствие спецификации D3D12. В `dxgi_format_compatibility_list[]`
+(`srcs/vkd3d-proton/libs/vkd3d/utils.c`) классы зеркалят typeless-семьи, и
+BGRA/RGBA — два **непересекающихся** класса:
+
+```c
+// utils.c:317 — RGBA8-семья: только варианты одного порядка каналов
+{DXGI_FORMAT_R8G8B8A8_TYPELESS,
+        {R8G8B8A8_UINT, R8G8B8A8_SINT, R8G8B8A8_UNORM,
+         R8G8B8A8_UNORM_SRGB, R8G8B8A8_SNORM}, …},
+
+// utils.c:457 — BGRA8-семья, отдельно
+{DXGI_FORMAT_B8G8R8A8_TYPELESS,
+        {B8G8R8A8_UNORM, B8G8R8A8_UNORM_SRGB}, …},
+```
+
+UNORM/SNORM/UINT/SINT совместимы, потому что интерпретируют одни и те же
+биты одинаково; `R8G8B8A8 ↔ B8G8R8A8` — нет, порядок каналов разный, и
+D3D12 такой каст не допускает.
+
+Второй потребитель mutable-списков — **Zink** (GL-шлюз в Vulkan, т.е. в
+наш turnip; `src/gallium/drivers/zink/zink_resource.c:1561`,
+`setup_format_list()`) — строит ровно два вида списков:
+
+```c
+if (!(templ->bind & ZINK_BIND_MUTABLE) && can_srgb) {   /* linear ↔ srgb */
+   srgb = util_format_is_srgb(templ->format) ? util_format_linear(templ->format)
+                                             : util_format_srgb(templ->format);
+}
+if (srgb) { formats[0] = zink_get_format(…, templ->format);
+            formats[1] = zink_get_format(…, srgb); }      /* тот же канал-порядок */
+else if (templ->bind & ZINK_BIND_VIDEO) { … }            /* плоскости одного формата */
+```
+
+То есть всегда `формат + его sRGB-вариант` либо плоскости одного формата —
+**порядок каналов одинаковый**, кросс-порядка нет.
+
+Итог: кросс-порядковые списки недостижимы ни для D3D12, ни для GL через Zink.
+Отдельно стоит, что Zink постоянно строит **uniform-swap** списки
+(`RGBA8_UNORM ↔ RGBA8_SRGB`), и именно их чинит **патч 0005**: на стоке они
+падают в linear без UBWC, с 0005 остаются tiled+сжатыми. Это реальная
+оптимизация для GL-игр на Zink — в отличие от cross-order, у которого
+потребителей нет.
 
 ## 17. Замер памяти RE4 (30.09)
 

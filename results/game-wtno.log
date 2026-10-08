@@ -1,0 +1,88 @@
+# date: 2026-09-30T22:45:42+08:00
+# exe: /run/media/armada/Z Slim/Games/Wolfenstein The New Order/WolfNewOrder_x64.exe
+# render: OpenGL (id Tech 5) — стоковый GL kgsl_dri, turnip не участвует
+# WINE_FULLSCREEN_FSR=1 strength=5
+# MANGOHUD=1
+# MANGOHUD_CONFIG=autostart_log,log_interval=1000,log_duration=180,output_folder=/tmp/opencode/mangologs
+# ---
+ProtonFixes[217035] INFO: Running protonfixes on "cachyos-11.0-20260703-slr", build at 2026-07-21 23:36:49+00:00.
+ProtonFixes[217035] INFO: Running checks
+ProtonFixes[217035] INFO: All checks successful
+ProtonFixes[217035] INFO: Using early stage global defaults for UNKNOWN (2014)
+ProtonFixes[217035] INFO: No early stage global protonfix found for UNKNOWN (2014)
+[Vulkan Loader] WARNING:        terminator_CreateInstance: Received return code -9 from call to vkCreateInstance in ICD /usr/lib64/libvulkan_dzn.so. Skipping this driver.
+[2026-09-30 22:45:44.025] [MANGOHUD] [info] [cpu.cpp:636] hwmon: using input: /sys/class/hwmon/hwmon19/temp1_input
+ProtonFixes[217035] INFO: Setting up FSR4 version default.
+ProtonFixes[217035] INFO: Automatic FSR4 upgrade enabled.
+ProtonFixes[217035] INFO: Running protonfixes on "cachyos-11.0-20260703-slr", build at 2026-07-21 23:36:49+00:00.
+ProtonFixes[217035] INFO: Running checks
+ProtonFixes[217035] INFO: All checks successful
+ProtonFixes[217035] INFO: Using main stage global defaults for UNKNOWN (2014)
+ProtonFixes[217035] INFO: No main stage global protonfix found for UNKNOWN (2014)
+ntsync: up and running.
+[2026-09-30 22:45:50.686] [MANGOHUD] [info] [blacklist.cpp:86] process 'explorer.exe' is blacklisted in MangoHud
+[Vulkan Loader] WARNING:        terminator_CreateInstance: Received return code -9 from call to vkCreateInstance in ICD /usr/lib64/libvulkan_dzn.so. Skipping this driver.
+ATTENTION: default value of option tu_override_uncached_as_cache_coherent overridden by environment.
+[2026-09-30 22:45:50.755] [MANGOHUD] [info] [blacklist.cpp:86] process 'explorer.exe' is blacklisted in MangoHud
+D 150 Suspending: RIP: 6FFFF9D22860 SP: 6EAE688
+D 150 Suspending: RIP: 6FFFFFD64520 SP: 6EAED18
+D 150 Suspending: RIP: 6FFFF9D15443 SP: 6EAE850
+D 23C Ran out of slots. Can't allocate more
+D 24C Ran out of slots. Can't allocate more
+D 248 Ran out of slots. Can't allocate more
+D 250 Ran out of slots. Can't allocate more
+[2026-09-30 22:45:59.303] [MANGOHUD] [info] [cpu.cpp:636] hwmon: using input: /sys/class/hwmon/hwmon19/temp1_input
+[2026-09-30 22:45:59.341] [MANGOHUD] [error] [file_utils.cpp:47] Error opening directory '/sys/class/powercap/': No such file or directory
+[2026-09-30 22:45:59.341] [MANGOHUD] [error] [cpu.cpp:794] Failed to initialize CPU power data
+[2026-09-30 22:45:59.864] [MANGOHUD] [error] [file_utils.cpp:47] Error opening directory '/sys/class/powercap/': No such file or directory
+[2026-09-30 22:45:59.864] [MANGOHUD] [error] [cpu.cpp:794] Failed to initialize CPU power data
+D 150 Suspending: RIP: 6FFFF9774FB1 SP: 6EAF4A8
+[2026-09-30 22:46:00.396] [MANGOHUD] [error] [file_utils.cpp:47] Error opening directory '/sys/class/powercap/': No such file or directory
+[2026-09-30 22:46:00.396] [MANGOHUD] [error] [cpu.cpp:794] Failed to initialize CPU power data
+[2026-09-30 22:46:00.897] [MANGOHUD] [error] [file_utils.cpp:47] Error opening directory '/sys/class/powercap/': No such file or directory
+[2026-09-30 22:46:00.897] [MANGOHUD] [error] [cpu.cpp:794] Failed to initialize CPU power data
+[2026-09-30 22:46:01.429] [MANGOHUD] [error] [file_utils.cpp:47] Error opening directory '/sys/class/powercap/': No such file or directory
+[2026-09-30 22:46:01.429] [MANGOHUD] [error] [cpu.cpp:794] Failed to initialize CPU power data
+D 150 Suspending: RIP: 6FFFF9772162 SP: 6EAED88
+D 150 Suspending: RIP: 6FFFF9772162 SP: 6EAF3F8
+D 150 Suspending: RIP: 6FFFF9784CDB SP: 6EAED88
+D 150 Suspending: RIP: 6FFFFFD672B0 SP: 6EAF318
+D 150 Suspending: RIP: 6FFFFFF20970 SP: 6EAF2C8
+D 284 Ran out of slots. Can't allocate more
+D 288 Ran out of slots. Can't allocate more
+D 290 Ran out of slots. Can't allocate more
+D 294 Ran out of slots. Can't allocate more
+D 298 Ran out of slots. Can't allocate more
+D 29C Ran out of slots. Can't allocate more
+D 2A0 Ran out of slots. Can't allocate more
+D 2A4 Ran out of slots. Can't allocate more
+D 2A8 Ran out of slots. Can't allocate more
+D 2B0 Ran out of slots. Can't allocate more
+D 2B4 Ran out of slots. Can't allocate more
+D 2BC Ran out of slots. Can't allocate more
+D 2C0 Ran out of slots. Can't allocate more
+D 2C4 Ran out of slots. Can't allocate more
+D 2C8 Ran out of slots. Can't allocate more
+D 2CC Ran out of slots. Can't allocate more
+D 2D0 Ran out of slots. Can't allocate more
+Traceback (most recent call last):
+  File "/usr/share/steam/compatibilitytools.d/proton-cachyos-11.0-arm64/proton", line 2457, in <module>
+    rc = g_session.run()
+  File "/usr/share/steam/compatibilitytools.d/proton-cachyos-11.0-arm64/proton", line 2397, in run
+    rc = self.run_proc(adverb + argv + sys.argv[2:] + self.cmdlineappend)
+  File "/usr/share/steam/compatibilitytools.d/proton-cachyos-11.0-arm64/proton", line 2346, in run_proc
+    return subprocess.call(args, env=local_env, stderr=self.log_file, stdout=self.log_file)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 398, in call
+    return p.wait(timeout=timeout)
+           ~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 1279, in wait
+    return self._wait(timeout=timeout)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 2084, in _wait
+    (pid, sts) = self._try_wait(0)
+                 ~~~~~~~~~~~~~~^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 2042, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+                 ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
