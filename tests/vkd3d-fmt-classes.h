@@ -1,5 +1,5 @@
 /* Сгенерировано scripts/gen-vkd3d-lists.py из /var/home/armada/opencode/srcs/vkd3d-proton - не править руками. */
-#define VKD3D_MUTABLE_CLASS_COUNT 70
+#define VKD3D_MUTABLE_CLASS_COUNT 72
 struct vkd3d_fmt_class { const char *dxgi; VkFormat f[8]; unsigned int n; };
 static const struct vkd3d_fmt_class vkd3d_fmt_classes[] = {
     { "R32G32B32A32_TYPELESS", { VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_R32G32B32A32_UINT, VK_FORMAT_R32G32B32A32_SINT }, 3 },

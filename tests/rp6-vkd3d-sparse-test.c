@@ -1125,6 +1125,85 @@ cleanup:
     if (sam != VK_NULL_HANDLE) vkDestroySampler(dev, sam, NULL);
 }
 
+/* Что мерить в первую очередь: способен ли ФОРМАТ в принципе держать UBWC.
+ *
+ * Модель гейта (scripts/fmt-list-gate-check.py --blockers) делит 41 класс, где
+ * список уходит в режим без UBWC, на две группы: 18 недостижимы по
+ * ubwc_possible() (BC*, планарное видео), и 23 упираются в сам гейт, то есть
+ * каждый формат по отдельности UBWC способен держать. Вторая группа — единственная,
+ * где правка правила имеет смысл, но там UNKNOWN означает «у blob-таблицы нет
+ * строки», а не «железо не умеет». Разница между этими двумя утверждениями
+ * решается только замером: если одиночный образ формата (без списка) получает
+ * метаданные UBWC, то гейт перестраховывается и вопрос к blob-таблице, а не к железу.
+ *
+ * Отсюда форма здесь: только memreq, без заливки и чтения. Смысл — убрать
+ * содержимое из вопроса и оставить чистую геометрию раскладки.
+ *
+ * Контроль линейности обязателен и должен быть тем же списком: при n=1
+ * tu6_mutable_format_list_ubwc_compatible() возвращает true безусловно, так что
+ * одиночный формат идёт мимо гейта, и memreq выше линейного означает ровно
+ * «UBWC заработал сам по себе». */
+static void probe_ubwc_ceiling(VkDevice dev, const char *tag, VkFormat base,
+                               const VkFormat *list, unsigned n, unsigned bpt)
+{
+    const unsigned w = 512, h = 512;
+    VkImageFormatListCreateInfo ifl = { VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO, NULL,
+                                        n, list };
+    /* три образа: линейный этало��, тот же список без MUTABLE, и он же с MUTABLE */
+    struct { VkImage img; VkDeviceSize size; const char *what; } v[3] = {};
+
+    for (int t = 0; t < 3; t++) {
+        VkImageCreateInfo ici = { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                                  .imageType = VK_IMAGE_TYPE_2D,
+                                  .format = base,
+                                  .extent = { w, h, 1 },
+                                  .mipLevels = 1,
+                                  .arrayLayers = 1,
+                                  .samples = VK_SAMPLE_COUNT_1_BIT,
+                                  .usage = VK_IMAGE_USAGE_SAMPLED_BIT |
+                                           VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                           VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                  .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                                  .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED };
+        switch (t) {
+        case 0: ici.tiling = VK_IMAGE_TILING_LINEAR; v[t].what = "lin"; break;
+        case 1: ici.tiling = VK_IMAGE_TILING_OPTIMAL; v[t].what = "nonmut"; break;
+        default:
+            ici.tiling = VK_IMAGE_TILING_OPTIMAL;
+            ici.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+            ici.pNext = &ifl;
+            v[t].what = "list";
+            break;
+        }
+        v[t].img = VK_NULL_HANDLE;
+        VkResult rr = vkCreateImage(dev, &ici, NULL, &v[t].img);
+        if (rr != VK_SUCCESS) {
+            printf("CEIL[%s] create %s: %s\n", tag, v[t].what, vkerr(rr));
+            goto done;
+        }
+        VkMemoryRequirements mr;
+        vkGetImageMemoryRequirements(dev, v[t].img, &mr);
+        v[t].size = mr.size;
+    }
+
+    {
+        /* nonmut > lin  => формат сам держит UBWC, потолок есть.
+         * list  < nonmut => гейт снял то, что формат мог.  list == nonmut
+         * и nonmut == lin => потолка нет, блокер не в гейте. */
+        int ceiling = v[1].size > v[0].size;
+        const char *verdict = !ceiling ? "потолка нет (ubwc_possible)"
+                                       : (v[2].size >= v[1].size ? "гейт не мешает" : "ГЕЙТ СНЯЛ");
+        printf("CEIL[%-22s] n=%u %2uB/texel  lin=0x%08llx nonmut=0x%08llx "
+               "list=0x%08llx  -> %s\n", tag, n, bpt,
+               (unsigned long long)v[0].size, (unsigned long long)v[1].size,
+               (unsigned long long)v[2].size, verdict);
+    }
+
+done:
+    for (int t = 0; t < 3; t++)
+        if (v[t].img != VK_NULL_HANDLE) vkDestroyImage(dev, v[t].img, NULL);
+}
+
 static void probe_ubwc_class(VkDevice dev, VkQueue q, VkCommandPool pool, const char *tag,
                              VkFormat base, const VkFormat *list, unsigned n, unsigned bpt)
 {
@@ -2029,7 +2108,11 @@ skip_b:
      *   mutable  = MUTABLE only                              (control)
      * A class counts as REJECTED only when sparse fails and mutable succeeds:
      * that isolates the sparse gate. sparse==mutable==fail means something
-     * else refuses the format+usage, which is a separate finding. */
+     * else refuses the format+usage, which is a separate finding.
+     *
+     * VKD3D_MUTABLE_CLASS_COUNT обязан равняться числу элементов массива: при
+     * 70 вместо 72 цикл молча перебирал первые 70 классов, и P010/P016 не
+     * измерялись вообще. */
     printf("\n=== V. все %d списков совместимости vkd3d против SPARSE+MUTABLE ===",
            VKD3D_MUTABLE_CLASS_COUNT);
     {
@@ -3439,6 +3522,65 @@ skip_b:
             };
             for (unsigned i = 0; i < ARRAY_SIZE(u); i++)
                 probe_ubwc_class(dev, q, pool, u[i].tag, u[i].base, u[i].f, u[i].n, u[i].bpt);
+
+            /* CEIL. Потолок UBWC по каждому формату отдельно.  Это разделяет
+             * две вещи, которые модель гейта смешивает: «формат не умеет
+             * UBWC» (ubwc_possible) и «список сломал то, что формат умеет»
+             * (гейт).  Только вторая группа даёт выигрыш правкой правила.
+             *
+             * Форматы взяты из группы B разбора --blockers, то есть тех 23
+             * классов, где блокером является сам гейт.  Списки — настоящие
+             * списки vkd3d из tests/vkd3d-fmt-classes.h. */
+            printf("\n=== CEIL. Потолок UBWC: гейт или формат ===\n");
+            {
+                static const VkFormat c_r16[] = { VK_FORMAT_R16_UNORM, VK_FORMAT_R16_UINT,
+                                                  VK_FORMAT_R16_SINT, VK_FORMAT_R16_SNORM };
+                static const VkFormat c_r16u[] = { VK_FORMAT_R16_UINT, VK_FORMAT_R16_SINT,
+                                                   VK_FORMAT_R16_UNORM };
+                static const VkFormat c_r8[] = { VK_FORMAT_R8_UNORM, VK_FORMAT_R8_UINT,
+                                                 VK_FORMAT_R8_SINT, VK_FORMAT_R8_SNORM };
+                static const VkFormat c_r8u[] = { VK_FORMAT_R8_UINT, VK_FORMAT_R8_SINT,
+                                                  VK_FORMAT_R8_UNORM };
+                static const VkFormat c_r32g32b32[] = { VK_FORMAT_R32G32B32_SFLOAT,
+                                                        VK_FORMAT_R32G32B32_UINT,
+                                                        VK_FORMAT_R32G32B32_SINT };
+                static const VkFormat c_r32g32b32u[] = { VK_FORMAT_R32G32B32_UINT,
+                                                         VK_FORMAT_R32G32B32_SINT };
+                static const VkFormat c_r10g10b10a2[] = { VK_FORMAT_A2B10G10R10_UNORM_PACK32,
+                                                           VK_FORMAT_A2B10G10R10_UINT_PACK32 };
+                static const VkFormat c_bgra8[] = { VK_FORMAT_B8G8R8A8_UNORM,
+                                                   VK_FORMAT_B8G8R8A8_SRGB };
+                static const struct {
+                    const char *tag;
+                    VkFormat base;
+                    const VkFormat *f;
+                    unsigned n;
+                    unsigned bpt;
+                } c[] = {
+                    /* блокер: нет строки в blob для одноканального 16 бит */
+                    { "R16_TYPELESS",   VK_FORMAT_R16_UNORM,  c_r16,  ARRAY_SIZE(c_r16), 2 },
+                    { "R16_UINT",       VK_FORMAT_R16_UINT,   c_r16u, ARRAY_SIZE(c_r16u), 2 },
+                    /* контроль к нему же: 2-компонентный 16 бит строку в blob ИМЕЕТ */
+                    { "CTRL_R16G16",    VK_FORMAT_R16G16_UINT, NULL,  0, 4 },
+                    /* блокер: 8 бит на блок, has_8bpp_ubwc = false */
+                    { "R8_TYPELESS",    VK_FORMAT_R8_UNORM,   c_r8,   ARRAY_SIZE(c_r8), 1 },
+                    { "R8_UINT",        VK_FORMAT_R8_UINT,    c_r8u,  ARRAY_SIZE(c_r8u), 1 },
+                    /* блокер: 3-компонентный 32 бит */
+                    { "R32G32B32_TYPELESS", VK_FORMAT_R32G32B32_SFLOAT, c_r32g32b32,
+                      ARRAY_SIZE(c_r32g32b32), 12 },
+                    { "R32G32B32_UINT",     VK_FORMAT_R32G32B32_UINT,  c_r32g32b32u,
+                      ARRAY_SIZE(c_r32g32b32u), 12 },
+                    /* блокер: packed 10 бит */
+                    { "R10G10B10A2_TYPELESS", VK_FORMAT_A2B10G10R10_UNORM_PACK32, c_r10g10b10a2,
+                      ARRAY_SIZE(c_r10g10b10a2), 4 },
+                    /* блокер, который 0006 закрывает: B8G8R8A8-семейство вне UNORM */
+                    { "B8G8R8A8_UNORM", VK_FORMAT_B8G8R8A8_UNORM, c_bgra8, ARRAY_SIZE(c_bgra8), 4 },
+                };
+                for (unsigned i = 0; i < ARRAY_SIZE(c); i++)
+                    probe_ubwc_ceiling(dev, c[i].tag, c[i].base,
+                                       c[i].f ? c[i].f : (const VkFormat *)&c[i].base,
+                                       c[i].f ? c[i].n : 1, c[i].bpt);
+            }
 
             /* vkd3d-овский список для typeless-BGRA8 под UAV: единственный класс,
              * который на стоке уходит в linear, и единственный, где linear

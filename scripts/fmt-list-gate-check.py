@@ -45,8 +45,71 @@ DEFAULT_TABLE = "/var/home/armada/opencode/build/mesa-rp6/src/freedreno/fdl/fd6_
 UNKNOWN = "UNKNOWN_COMPAT"
 NV12_VK = "G8_B8R8_2PLANE_420_UNORM"
 
-# a7xx_gen2 (FD740) из src/freedreno/common/freedreno_devices.py
-GEN2_PROPS = {"ubwc_unorm_snorm_int_compatible": True, "ubwc_all_formats_compatible": False}
+# a7xx_gen2 (FD740) из src/freedreno/common/freedreno_devices.py.
+# has_8bpp_ubwc = False наследуется от a6xx_gen2, supports_uav_ubwc = True стоит
+# прямо в a7xx_gen2, то есть у UAV-образов гейт списка — действительно
+# ограничивающий фактор, а у 8-битных на блок — нет.
+GEN2_PROPS = {"ubwc_unorm_snorm_int_compatible": True, "ubwc_all_formats_compatible": False,
+              "has_8bpp_ubwc": False, "supports_uav_ubwc": True}
+
+# Формы блока, для которых в стоковом fd6_ubwc_compat_mode() есть строки:
+# (число каналов, бит на канал). Взят из списка case заголовка.
+SHAPES_IN_BLOB = {(2, 8), (4, 8), (2, 16), (4, 16), (1, 32), (2, 32), (4, 32)}
+
+# Форматы, для которых UBWC невозможен независимо от гейта (tu6_ubwc_possible).
+NO_UBWC_ALWAYS = ("BC", "ASTC", "ETC2", "EAC", "PVRTC", "G8_B8R8_2PLANE",
+                  "G8_B8R8A8_2PLANE", "G16_B16R16_2PLANE_420", "G12B12G12B12_2PLANE_420",
+                  "G10X6", "G16_B16R16_2PLANE_422", "G12B12G12B12_2PLANE_422",
+                  "G24X8", "G24Y8", "R64_UINT", "R64_SINT", "R64G64", "E5B9G9R9_UFLOAT_PACK32",
+                  "S8_UINT")
+
+
+def is_compressed(f):
+    """Блок-компрессия или планарное видео: UBWC для них невозможен по
+    tu6_ubwc_possible() независимо от того, что решил гейт."""
+    return norm(f).startswith(NO_UBWC_ALWAYS)
+
+
+def why_unknown(f, props):
+    """Почему fd6_ubwc_compat_mode() отдаёт UNKNOWN для этого формата.
+
+    Это ключ к следующему рычагу: UNKNOWN означает «у blob-таблицы нет строки»,
+    и потому НЕ исправляется никаким правилом в драйвере — нужно либо найти
+    эквивалентный уже существующий класс, либо признать, что вопрос к железу.
+    """
+    f, g = norm(f), stem(f)
+    if is_compressed(f):
+        return "сжатый/плоский: UBWC невозможен"
+    if re.fullmatch(r"R8(?:_[A-Z]+)?", g):
+        return "8 бит на блок: has_8bpp_ubwc=False"
+    if g in ("Z32_FLOAT", "Z24_UNORM_S8_UINT", "D24_UNORM_S8_UINT", "D32_SFLOAT",
+             "X8_D24_UNORM_PACK32", "D16_UNORM"):
+        return "глубина: отдельная семантика clear"
+    if f in ("R64_UINT", "R64_SINT") or g.startswith("R64G64"):
+        return "R64: UBWC запрещён"
+    if g.startswith("R16_UINT") or g.startswith("R16_SINT") or g.startswith("R16_SNORM") \
+            or g == "R16_UNORM":
+        return "одноканальный 16 бит: строки в blob нет"
+    if g.startswith("R10G10B10A2") or g.startswith("A2B10G10R10") \
+            or g.startswith("A2R10G10B10") or g.startswith("R11G11B10") \
+            or g.startswith("R5G6B5") or g.startswith("B5G6R5") or g.startswith("B5G5R5A1") \
+            or g.startswith("B4G4R4A4") or g.startswith("R4G4B4A4"):
+        return "packed-10/5/4 бит: строки в blob нет"
+    if g.startswith("R32G32B32") and "A32" not in g:
+        return "3-компонентный 32 бит: строки в blob нет"
+    if re.fullmatch(r"R8G8B8_[A-Z]+", g) or re.fullmatch(r"B8G8R8_[A-Z]+", g):
+        return "3-компонентный 8 бит: строки в blob нет"
+    if re.fullmatch(r"R16G16B16_[A-Z]+", g) or re.fullmatch(r"B16G16R16_[A-Z]+", g):
+        return "3-компонентный 16 бит: строки в blob нет"
+    if g.startswith("R32_SFLOAT") or g.startswith("R32G32_FLOAT") \
+            or g.startswith("R32G32B32A32_FLOAT") or g.startswith("R16G16_FLOAT") \
+            or g.startswith("R16G16B16A16_FLOAT"):
+        return "_SFLOAT вне целочисленных классов (эксп. 0008)"
+    if g.startswith("B8G8R8A8") or g.startswith("B8G8R8X8"):
+        return "B8G8R8A8-семейство вне UNORM-класса (патч 0006)"
+    if re.fullmatch(r"[RGBA]\d+[RGBA]\d+[RGBA]\d+[RGBA]?\d*_[A-Z0-9_]+", g):
+        return "нет строки в blob"
+    return "нет строки в blob"
 
 
 def load_format_table(path):
@@ -63,7 +126,7 @@ def load_format_table(path):
     return swap, srgb
 
 
-def fd6_ubwc_compat_mode(fmt, props, patch_0006=False, patch_0010=False):
+def fd6_ubwc_compat_mode(fmt, props, patch_0006=False, patch_0010=False, patch_0011=False):
     """Перенос fd6_ubwc_compat_mode() из freedreno_ubwc.h (сток).
 
     patch_0010 — эксперимент: включить _SFLOAT-члены в целочисленные
@@ -112,6 +175,21 @@ def fd6_ubwc_compat_mode(fmt, props, patch_0006=False, patch_0010=False):
     if fmt in ("R32G32B32A32_UINT", "R32G32B32A32_SINT"):
         return "R32G32B32A32_INT"
 
+    if patch_0011:
+        # Одноканальный 16-битный и packed-10-битный.  Ни строки, ни даже
+        # упоминания в fd6_format_table.c, но замер на 740 (results/test-CEIL-
+        # stock.log, CEIL) показывает: одиночный образ R16_UNORM и
+        # A2B10G10R10_UNORM_PACK32 БЕЗ списка получают метаданные UBWC, то
+        # есть потолок есть, и его снимает именно гейт.  Все четыре варианта
+        # одного размера блока (16 бит) различаются только интерпретацией.
+        if fmt in ("R16_UNORM", "R16_SNORM", "R16_UINT", "R16_SINT",
+                   "R16_FLOAT", "R16_SFLOAT"):
+            return "R16_INT"
+        # norm() срезает _PACK32, поэтому имена уже без суффикса
+        if fmt in ("A2B10G10R10_UNORM", "A2B10G10R10_UINT",
+                   "A2B10G10R10_SNORM", "R11G11B10_FLOAT"):
+            return "A2B10G10R10_INT"
+
     if patch_0010:
         # каст внутри одного layout — те же биты, другое прочтение.
         # Z32_FLOAT НЕ трогаем: у него другая роль (depth), и сток
@@ -143,17 +221,156 @@ def fd6_ubwc_compat_mode(fmt, props, patch_0006=False, patch_0010=False):
     return UNKNOWN
 
 
-def ubwc_compatible(formats, props, patch_0006, patch_0010=False):
+def ubwc_compatible(formats, props, patch_0006, patch_0010=False, patch_0011=False):
     """tu6_mutable_format_list_ubwc_compatible(): True => весь блок пропускается."""
     if not formats:
         return False
     if len(formats) == 1:
         return True
-    first = fd6_ubwc_compat_mode(formats[0], props, patch_0006, patch_0010)
+    first = fd6_ubwc_compat_mode(formats[0], props, patch_0006, patch_0010, patch_0011)
     if first == UNKNOWN:
         return False
-    return all(fd6_ubwc_compat_mode(f, props, patch_0006, patch_0010) == first
+    return all(fd6_ubwc_compat_mode(f, props, patch_0006, patch_0010, patch_0011) == first
                for f in formats[1:])
+
+
+def ubwc_groups(formats, props, patch_0006=False, patch_0010=False, patch_0011=False):
+    """Разбивка списка по compat-режимам: [(режим, [форматы]), ...]."""
+    groups = {}
+    for f in formats:
+        groups.setdefault(fd6_ubwc_compat_mode(f, props, patch_0006, patch_0010, patch_0011), []).append(f)
+    return sorted(groups.items(), key=lambda kv: (kv[0] == UNKNOWN, kv[0]))
+
+
+def blockers(formats, props, patch_0006=False, patch_0010=False, patch_0011=False):
+    """Сигнатура того, что ломает гейт, плюс сами блокирующие пары.
+
+    Сигнатура — отсортированный список (режим, первый формат этого режима).
+    Форматы с UNKNOWN выносятся в конец: для них blob-таблицы a630/a660 не
+    содержит строки вообще, поэтому никакое расширение правил их не закроет.
+    """
+    groups = ubwc_groups(formats, props, patch_0006, patch_0010, patch_0011)
+    sig = tuple((mode, fmts[0]) for mode, fmts in groups)
+    pairs = []
+    for i, (m1, f1s) in enumerate(groups):
+        for m2, f2s in groups[i + 1:]:
+            pairs.append((f1s[0], m1, f2s[0], m2))
+    return sig, pairs, groups
+
+
+def report_blockers(swap, classes, props, patch_0006=False, patch_0010=False, patch_0011=False):
+    """Разбор классов, у которых гейт снимает UBWC, но тайлинг остаётся."""
+    rows = []
+    for name, fmts in classes:
+        if ubwc_compatible(fmts, props, patch_0006, patch_0010, patch_0011):
+            continue
+        sig, pairs, groups = blockers(fmts, props, patch_0006, patch_0010, patch_0011)
+        rows.append((name, fmts, sig, pairs, groups))
+    if not rows:
+        print("\n### Блокеры UBWC: таких классов нет\n")
+        return
+    print(f"\n### Что блокирует снятие UBWC: {len(rows)} классов\n")
+    print("A. Не блокер гейта: формату UBWC невозможен в принципе "
+          "(tu6_ubwc_possible()).\n")
+    hard = [r for r in rows if any(is_compressed(f) for f in r[1])]
+    for name, fmts, sig, pairs, groups in hard:
+        base = fmts[0]
+        print(f"  [{len(fmts)}] {name:26} базовый={base:16} {why_unknown(base, props)}")
+    print(f"  итого недостижимо: {len(hard)} классов из {len(rows)}\n")
+
+    print("B. Блокер — сам гейт: список уходит в режим без UBWC, хотя каждый "
+          "формат по отдельности\n   UBWC держит. Это единственная группа, где "
+          "правка правила имеет смысл.\n")
+    soft = [r for r in rows if r not in hard]
+    buckets = {}
+    for name, fmts, sig, pairs, groups in soft:
+        buckets.setdefault(sig, []).append((name, fmts, pairs))
+    for sig, lst in sorted(buckets.items(), key=lambda x: -len(x[1])):
+        head = " + ".join(f"{m}({f})" for m, f in sig)
+        print(f"  [{len(lst):3}] {head}")
+        for name, fmts, pairs in lst:
+            why = why_unknown([f for m, f in sig if m == UNKNOWN][0], props) \
+                if any(m == UNKNOWN for m, _ in sig) else "?"
+            print(f"          {name:26} n={len(fmts):2}  причина UNKNOWN: {why}")
+    print(f"\n  итого блокером гейта: {len(soft)} из {len(rows)} классов")
+    return rows
+
+
+def report_0011(swap, classes, props):
+    """Что меняет эксперимент 0011: строки для R16_* и A2B10G10R10_*.
+
+    Основание — замер, а не рассуждение.  Проба CEIL (results/test-CEIL-
+    stock.log) показала, что одиночный R16_UNORM и A2B10G10R10_UNORM_PACK32 без
+    списка получают метаданные UBWC: потолок есть.  Список их снимает, потому
+    что fd6_ubwc_compat_mode() для них молчит.  В отличие от 0008 здесь не
+    нужно утверждать, что blob «allows but not a660»: форматы в blob-таблице не
+    упомянуты вообще, и A2B10G10R10 нет даже в fd6_format_table.c.
+    """
+    closed = []
+    for name, fmts in classes:
+        if ubwc_compatible(fmts, props, False, patch_0010=True):
+            continue
+        if not ubwc_compatible(fmts, props, False, patch_0010=True, patch_0011=True):
+            continue
+        # tu_image_init() отдаёт кортеж (Layout, сработал ли ранний выход), а
+        # вердикт здесь — про UBWC, то есть про ранний выход.
+        _, early_before = tu_image_init(fmts[0], fmts, swap, props, patch_0010=True)
+        _, early_after = tu_image_init(fmts[0], fmts, swap, props, patch_0010=True,
+                                       patch_0011=True)
+        closed.append((name, fmts, "UBWC снят гейтом" if not early_before else "UBWC",
+                       "tiled+UBWC" if early_after else "??"))
+    print(f"\n### Эксперимент 0011: закрывает {len(closed)} классов\n")
+    for name, fmts, before, after in closed:
+        print(f"  {name:24} n={len(fmts)}  {before}  ->  {after}")
+    return closed
+
+
+def report_stack(swap, classes, props, patch_0011=False):
+    """Раскладка рабочего стека ArmadOS и разбор оставшихся tiled, no-UBWC.
+
+    Рабочий стек — 0004, 0005, 0006, 0008 (_SFLOAT), 0009, 0010.  0004 и 0007 на
+    раскладку не влияют: 0004 запрещает sparse, 0007 — только диагностика.
+
+    Группы порядят НЕ по префиксу имени.  Первая версия этого разбора так и
+    делала, и `G16_B16R16_2PLANE_420_UNORM` уехал в группу `R16_*`, а
+    `G8_B8R8_2PLANE_420_UNORM` — в `R8_*`, потому что `R16_` и `R8_` в них
+    встречаются как подстрока.  Проверка на сжатие идёт первой, форматы
+    плоского видео отсеиваются ею же.
+    """
+    kw = dict(patch_0005=True, patch_0006=True, patch_0010=True, exp_0009=True)
+    n_ubwc = n_lin = 0
+    groups = {}
+    for name, fmts in classes:
+        L, _ = tu_image_init(fmts[0], fmts, swap, props, patch_0011=patch_0011, **kw)
+        if L.ubwc:
+            n_ubwc += 1
+            continue
+        if not L.tiled:
+            n_lin += 1
+            continue
+        if any(is_compressed(f) for f in fmts):
+            fam = "сжатые и планарные: ubwc_possible() = false"
+        elif any(norm(f).startswith("R8_") for f in fmts):
+            fam = "R8_*: has_8bpp_ubwc = false, потолка нет"
+        elif any("R32G32B32" in norm(f) for f in fmts):
+            fam = "R32G32B32_*: потолка нет"
+        elif any(norm(f).startswith(("R16_", "A2B10G10R10", "R10G10B10A2"))
+                 for f in fmts):
+            fam = "R16_* / R10G10B10A2_*: потолок есть, снимает гейт"
+        else:
+            # остаётся случай двух compat-классов в одном списке: vkd3d сам
+            # дописывает R32{U,I,F} ради typed UAV load
+            fam = "два compat-класса в одном списке (B8G8R8A8_UNORM + R32_*)"
+        groups.setdefault(fam, []).append(name)
+
+    rest = sum(len(v) for v in groups.values())
+    print(f"\n### Рабочий стек (0004, 0005, 0006, 0008, 0009, 0010"
+          f"{', 0011' if patch_0011 else ''}): из {len(classes)} классов")
+    print(f"  UBWC: {n_ubwc}   linear: {n_lin}   tiled, no-UBWC: {rest}\n")
+    for tag, lst in sorted(groups.items(), key=lambda x: -len(x[1])):
+        print(f"  [{len(lst):2}] {tag}")
+        print(f"        {', '.join(lst)}")
+    return groups
 
 
 def geom(fmt):
@@ -267,9 +484,11 @@ class Layout:
         return format(str(self), spec)
 
 
-def tu_image_init(base, formats, swap, props, patch_0005=False, patch_0006=False, patch_0009=True, patch_0010=False, exp_0009=False, exp_0010=False):
+def tu_image_init(base, formats, swap, props, patch_0005=False, patch_0006=False,
+                  patch_0009=True, patch_0010=False, patch_0011=False,
+                  exp_0009=False, exp_0010=False):
     """Возвращает (Layout, сработал ли ранний выход)."""
-    if ubwc_compatible(formats, props, patch_0006, patch_0010):
+    if ubwc_compatible(formats, props, patch_0006, patch_0010, patch_0011):
         return Layout(True, True, "ранний выход: список UBWC-совместим"), True
 
     if base == NV12_VK:
@@ -488,6 +707,14 @@ def main():
                     help="эксперимент 0009: одноканальный формат не выводит список в linear")
     ap.add_argument("--exp-0010", action="store_true",
                     help="эксперимент 0010: MUTABLEEN без UBWC в ветке !mutable_ubwc_fc")
+    ap.add_argument("--blockers", action="store_true",
+                    help="разбор классов, где гейт снимает UBWC, но тайлинг остаётся")
+    ap.add_argument("--exp-0011", action="store_true",
+                    help="эксперимент 0011: строки для одноканального 16-битного "
+                         "и packed-10-битного в fd6_ubwc_compat_mode()")
+    ap.add_argument("--stack", action="store_true",
+                    help="раскладка рабочего стека и разбор оставшихся "
+                         "tiled, no-UBWC классов")
     args = ap.parse_args()
 
     if not os.path.exists(args.table):
@@ -502,8 +729,21 @@ def main():
     print()
 
     if os.path.exists(args.classes):
-        report_vkd3d(swap, load_vkd3d_classes(args.classes), GEN2_PROPS, args.exp_0009,
-                     args.exp_0010)
+        classes = load_vkd3d_classes(args.classes)
+        report_vkd3d(swap, classes, GEN2_PROPS, args.exp_0009, args.exp_0010)
+        if args.exp_0011:
+            report_0011(swap, classes, GEN2_PROPS)
+        if args.blockers:
+            print("\n" + "=" * 78)
+            report_blockers(swap, classes, GEN2_PROPS)
+            print("\n" + "-" * 78 + "\nс поправкой эксп. 0008 (_SFLOAT -> целочисленные классы):")
+            report_blockers(swap, classes, GEN2_PROPS, patch_0010=True)
+            if args.exp_0011:
+                print("\n" + "-" * 78 + "\nи с экспериментом 0011 (одноканальный 16 бит "
+                      "+ packed-10 бит):")
+                report_blockers(swap, classes, GEN2_PROPS, patch_0010=True, patch_0011=True)
+    if args.stack:
+        report_stack(swap, classes, GEN2_PROPS, patch_0011=args.exp_0011)
     report_zink(swap, GEN2_PROPS)
     if args.all_pairs:
         report_all_pairs(swap, GEN2_PROPS)
