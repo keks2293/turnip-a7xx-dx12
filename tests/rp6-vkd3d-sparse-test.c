@@ -98,6 +98,15 @@
  *   S2) control: the mixed-swap list {BGRA8, RGBA8} and the NULL list stay
  *      rejected by query and create on 0004/0005 (stock: silent
  *      linear+sparse - the hole).
+ *   S3) EXPERIMENT probe (mixed-swap): NON-sparse MUTABLE
+ *      {BGRA8_UNORM, RGBA8_UNORM} - identical texel layout, different
+ *      channel order. Control (0004-0008): forced LINEAR (memreq 0x100000),
+ *      all reads exact. Experiment build keeps tiled+UBWC for same-shape
+ *      cross-order lists; on it the raw bytes must still round-trip, the
+ *      base BGRA view must stay EXACT (want = fill2 with b0<->b2), and the
+ *      RGBA cross view must be one of two deterministic answers -
+ *      identity (== fill2) or swapped (b0<->b2). Anything else is UBWC
+ *      cross-order garbage -> FAIL.
  *   T) P6 (0006) probe: NON-sparse MUTABLE {BGRA8_UNORM, BGRA8_UINT}
  *      (the D3D12 B8G8R8A8_TYPELESS class). Pre-0006: incompatible list
  *      (B8G8R8A8_UINT = UNKNOWN_COMPAT) + swaps -> LINEAR, memreq 0x100000.
@@ -2190,6 +2199,200 @@ skip_b:
             VkResult rcn = vkCreateImage(dev, &iim, NULL, &img_nl);
             printf("S2 vkCreateImage(MUTABLE+SPARSE, no list):       %s%s\n", vkerr(rcn),
                    rcn == VK_SUCCESS ? " (stock: silent linear+sparse - the hole)" : "");
+        }
+
+        /* S3. EXPERIMENT probe (mixed-swap): NON-sparse MUTABLE
+         * {BGRA8_UNORM, RGBA8_UNORM} - a same-shape list that differs only
+         * in channel order. Control build (0004-0008): the list is
+         * non-uniform -> LINEAR forced, memreq 0x100000, all reads exact.
+         * The experiment build keeps tiled+UBWC for such lists, and then all
+         * three must still hold: raw bytes round-trip through UBWC (S3-tr),
+         * the base BGRA view reads exact (want = fill2 with b0<->b2), and
+         * the RGBA cross view lands on one of the two deterministic
+         * candidates - identity (== fill2: the view's own format applied the
+         * swap) or swapped (b0<->b2, same as the base view). Anything else
+         * is UBWC cross-order garbage. */
+        {
+            VkFormat xo_list[2] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM };
+            VkImageFormatListCreateInfo ifl_xo = {
+                VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO, NULL, 2, xo_list };
+
+            VkImageCreateInfo iix = iig;
+            iix.format = VK_FORMAT_B8G8R8A8_UNORM;
+            iix.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+            iix.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            iix.pNext = &ifl_xo;
+            VkImage img_x = VK_NULL_HANDLE;
+            VkResult rcx = vkCreateImage(dev, &iix, NULL, &img_x);
+            printf("S3 vkCreateImage(OPTIMAL MUTABLE {BGRA8_UNORM,RGBA8_UNORM}): %s\n",
+                   vkerr(rcx));
+            if (rcx == VK_SUCCESS) {
+                VkMemoryRequirements xreq;
+                vkGetImageMemoryRequirements(dev, img_x, &xreq);
+                int x_ubwc = xreq.size > 0x100000;
+                printf("S3 memreq size=0x%llx %s\n", (unsigned long long)xreq.size,
+                       x_ubwc ? "(tiled + UBWC metadata - experiment path)"
+                              : "(no UBWC metadata: linear or plain tiled)");
+                VkDeviceMemory xmem;
+                chk(alloc_mem(dev, xreq.size, 0, &xmem), "alloc S3 mem");
+                chk(vkBindImageMemory(dev, img_x, xmem, 0), "bind S3 mem");
+
+                VkImageViewCreateInfo ivx = {
+                    VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, NULL, 0, img_x,
+                    VK_IMAGE_VIEW_TYPE_2D, VK_FORMAT_B8G8R8A8_UNORM,
+                    (VkComponentMapping){ VK_COMPONENT_SWIZZLE_IDENTITY,
+                                          VK_COMPONENT_SWIZZLE_IDENTITY,
+                                          VK_COMPONENT_SWIZZLE_IDENTITY,
+                                          VK_COMPONENT_SWIZZLE_IDENTITY },
+                    (VkImageSubresourceRange){ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 } };
+                VkImageView view_xb;
+                chk(vkCreateImageView(dev, &ivx, NULL, &view_xb), "view S3 base");
+                ivx.format = VK_FORMAT_R8G8B8A8_UNORM;
+                VkImageView view_xr;
+                chk(vkCreateImageView(dev, &ivx, NULL, &view_xr), "view S3 RGBA");
+
+                VkDescriptorPoolSize dpsz_x[2] = {
+                    { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2 },
+                    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2 } };
+                VkDescriptorPoolCreateInfo dpc_x = {
+                    VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, NULL, 0, 2, 2, dpsz_x };
+                VkDescriptorPool dp_x;
+                chk(vkCreateDescriptorPool(dev, &dpc_x, NULL, &dp_x), "create dpool(S3)");
+                VkDescriptorSetAllocateInfo dsa_x = {
+                    VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, NULL, dp_x, 2,
+                    (VkDescriptorSetLayout[]){ dsl, dsl } };
+                VkDescriptorSet dst_x[2];
+                chk(vkAllocateDescriptorSets(dev, &dsa_x, dst_x), "alloc dsets(S3)");
+                VkDescriptorImageInfo dii_x[2] = {
+                    { sam, view_xb, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                    { sam, view_xr, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL } };
+                VkDescriptorBufferInfo bfi_x = { rb, 0, VK_WHOLE_SIZE };
+                VkWriteDescriptorSet wrx[4] = {
+                    { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = dst_x[0],
+                      .dstBinding = 0, .descriptorCount = 1,
+                      .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                      .pImageInfo = &dii_x[0] },
+                    { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = dst_x[0],
+                      .dstBinding = 1, .descriptorCount = 1,
+                      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                      .pBufferInfo = &bfi_x },
+                    { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = dst_x[1],
+                      .dstBinding = 0, .descriptorCount = 1,
+                      .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                      .pImageInfo = &dii_x[1] },
+                    { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = dst_x[1],
+                      .dstBinding = 1, .descriptorCount = 1,
+                      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                      .pBufferInfo = &bfi_x } };
+                vkUpdateDescriptorSets(dev, 4, wrx, 0, NULL);
+
+                /* The two deterministic candidates for the cross view,
+                 * derived from fill2 the way T derives twant: identity
+                 * (fill2 as-is) and swapped (b0<->b2 = the base BGRA
+                 * answer). */
+                uint32_t *xwant_sw = malloc((size_t)W * H * 4);
+                for (int y = 0; y < H; y++)
+                    for (int x = 0; x < W; x++) {
+                        uint32_t f = fill2[y * W + x];
+                        xwant_sw[y * W + x] = ((f & 0x00FF0000u) >> 16) |
+                                              (f & 0x0000FF00u) |
+                                              ((f & 0x000000FFu) << 16) |
+                                              (f & 0xFF000000u);
+                    }
+
+                VkExtent3D full_ext = { W, H, 1 };
+                int x_bad_base;
+                chk(cast_roundtrip(dev, q, pool, img_x, VK_IMAGE_LAYOUT_UNDEFINED, 0,
+                                   full_ext, fill2, pipe_f32, dst_x[0], rbm, rbw) >= 0 ?
+                        VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY,
+                    "S3 roundtrip (base)");
+                x_bad_base = compare_words(rbw, xwant_sw, W, H, "s3-base");
+                chk(cast_roundtrip(dev, q, pool, img_x, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                   VK_ACCESS_SHADER_READ_BIT, full_ext, fill2, pipe_f32,
+                                   dst_x[1], rbm, rbw) >= 0 ?
+                        VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY,
+                    "S3 roundtrip (RGBA)");
+                /* Count both candidates silently: either may legitimately
+                 * match, and a fully wrong result would otherwise flood the
+                 * log with 16 mismatch lines before the verdict. */
+                int x_id = 0, x_sw = 0;
+                for (int i = 0; i < W * H; i++) {
+                    if (rbw[i] != fill2[i])
+                        x_id++;
+                    if (rbw[i] != xwant_sw[i])
+                        x_sw++;
+                }
+
+                /* S3-tr: raw transfer vs fill2 - the storage/UBWC verdict,
+                 * independent of any view or TP-swap modelling (as in T-tr):
+                 * bytes must round-trip unchanged through compress-on-store /
+                 * decompress-on-copy. */
+                int x_bad_tr = 0;
+                {
+                    VkBufferCreateInfo xci = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, NULL, 0,
+                                               (VkDeviceSize)W * H * 4,
+                                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                               VK_SHARING_MODE_EXCLUSIVE, 0, NULL };
+                    VkBuffer xb;
+                    chk(vkCreateBuffer(dev, &xci, NULL, &xb), "create S3-tr buf");
+                    VkMemoryRequirements xrr;
+                    vkGetBufferMemoryRequirements(dev, xb, &xrr);
+                    VkDeviceMemory xbm;
+                    chk(alloc_mem(dev, xrr.size, 0, &xbm), "alloc S3-tr mem");
+                    chk(vkBindBufferMemory(dev, xb, xbm, 0), "bind S3-tr mem");
+
+                    VkCommandBuffer xcb;
+                    VkCommandBufferAllocateInfo xcai = {
+                        VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, NULL, pool,
+                        VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1 };
+                    chk(vkAllocateCommandBuffers(dev, &xcai, &xcb), "alloc S3-tr cb");
+                    VkCommandBufferBeginInfo xbbi = {
+                        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, NULL,
+                        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, NULL };
+                    chk(vkBeginCommandBuffer(xcb, &xbbi), "begin S3-tr cb");
+                    VkBufferImageCopy xic = { 0, W, 0,
+                                              { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
+                                              { 0, 0, 0 }, { W, H, 1 } };
+                    vkCmdCopyImageToBuffer(xcb, img_x, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                           xb, 1, &xic);
+                    chk(vkEndCommandBuffer(xcb), "end S3-tr cb");
+                    VkSubmitInfo xsi = { VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, NULL,
+                                         1, &xcb, 0, NULL };
+                    chk(vkQueueSubmit(q, 1, &xsi, NULL), "submit S3-tr");
+                    vkQueueWaitIdle(q);
+                    vkFreeCommandBuffers(dev, pool, 1, &xcb);
+
+                    unsigned char *xp;
+                    chk(vkMapMemory(dev, xbm, 0, xrr.size, 0, (void **)&xp), "map S3-tr");
+                    for (int y = 0; y < H; y++)
+                        for (int x = 0; x < W; x++) {
+                            uint32_t w;
+                            memcpy(&w, xp + (size_t)(y * W + x) * 4, 4);
+                            if (w != fill2[y * W + x])
+                                x_bad_tr++;
+                        }
+                    printf("S3-tr transfer readback: %d/%u mismatches (raw bytes vs fill2)%s\n",
+                           x_bad_tr, (unsigned)(W * H),
+                           x_bad_tr ? " - storage roundtrip defect"
+                                    : " - bytes round-trip exact");
+                    vkUnmapMemory(dev, xbm);
+                }
+
+                printf("S3 probe: %s - %s; base view=%s, RGBA cross view=%s [id=%d sw=%d], "
+                       "raw=%s\n",
+                       (!x_bad_base && !x_bad_tr && (!x_id || !x_sw)) ? "PASS" : "FAIL",
+                       x_ubwc ? "tiled+UBWC" : "no UBWC (linear or plain tiled)",
+                       x_bad_base ? "MISMATCH" : "EXACT",
+                       !x_id ? "identity EXACT (== fill2)" :
+                       !x_sw ? "swapped EXACT (b0<->b2)" : "GARBAGE (neither)",
+                       x_id, x_sw,
+                       x_bad_tr ? "MISMATCH" : "EXACT");
+                free(xwant_sw);
+            } else {
+                printf("S3 probe: create rejected - unexpected for non-sparse mutable "
+                       "BGRA8+RGBA8 on this build\n");
+            }
         }
 
         /* T. P6 (0006) probe: NON-sparse MUTABLE {BGRA8_UNORM, BGRA8_UINT},
