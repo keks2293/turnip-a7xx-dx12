@@ -162,6 +162,36 @@ float-интерпретации. Проба на это не закрыта, р
 `docs/analysis.md` → теперь 19), и в нём нет WSI-devel пакетов, без которых
 ninja падает на линковке. Подробности и проверка содержимого — раздел 19.
 
+## Соответствие патчей и коммитов mesa
+
+Нумерация `0001–00XX` ведётся только здесь, в turnip-patches: это
+внутренняя очередь стека и экспериментов, на неё ссылаются `docs/`,
+`results/`, `experiments/` и шапки патчей. В репозитории
+[keks2293/mesa](https://github.com/keks2293/mesa) коммиты нумерации не
+носят и оформлены в общепринятом mesa-стиле: префикс подсистемы +
+императивное описание, без `000N` и внутренних номеров этапов.
+
+Ветки в mesa:
+
+- **`fix-auth`** — автор keks2293, исходные (русские) сообщения;
+- **`fix-auth-en`** — то же дерево, сообщения переведены на английский
+  с сохранением контекста, в mesa-стиле.
+
+| Patch / этап | Область | Коммиты mesa (`fix-auth` → `fix-auth-en`) | Заголовок в mesa-стиле (EN) |
+|---|---|---|---|
+| 0001–0003 | сборка образа | `3bb596f` → `f16b56c` | `armada: stock image patches 0001-0003` (без изменений) |
+| 0004 | `turnip/sparse` | `4ca598f` → `9ad3ab7` | `turnip: sparse: relax sparse residency gating and refine linear/sparse image creation checks` |
+| dgc M2.0 | `freedreno/dgc` | `e986710` → `64bfdbc` | `freedreno/dgc: prototype GPU-written PM4 via CP_INDIRECT_BUFFER` |
+| dgc M2.1 | `freedreno/dgc` | `1296148` → `c3db727` | `freedreno/dgc: implement VK_EXT_device_generated_commands (features, properties, entry points)` |
+| dgc M2.2 | `freedreno/dgc` | `a5c6af7` → `eb0f1fe` | `freedreno/dgc: add v1-scope validation to reject tokens outside the recorded range` |
+| dgc M2.3 | `freedreno/dgc` | `565d03f` → `6f576ec` | `freedreno/dgc: add GPU-side translator for command sequences to PM4 (WIP: stream path verified, draw submission not yet functional)` |
+
+DGC-коммиты (этапы M2.0–M2.3) — отдельная линейка разработки в mesa и
+патчам `0001–00XX` не соответствуют; внутренние номера этапов
+сохранены только в исходных сообщениях ветки `fix-auth`. Патчи
+`0005`, `0006`, `0009–0012` в mesa пока не вынесены — маппинг
+дополняется по мере переноса.
+
 ## Главное, что проверено измерением
 
 - **UBWC на A740 включён** для обычных образов: проба G даёт `0x102000` против
