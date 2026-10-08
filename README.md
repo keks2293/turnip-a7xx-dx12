@@ -115,16 +115,22 @@ Containerfile в `container/`). От `-Dplatforms=` в `scripts/build-turnip.sh`
 **Причина отказа найдена — это не гейт патчей.** Игра требует SM 6.6, а его
 даёт условие 6.2 в vkd3d: `shaderDenormPreserveFloat32`, которое Turnip берёт
 из driconf-опции `tu_enable_softfloat32`, включаемой в
-`00-turnip-defaults.conf` **только для движка `vkd3d`**. Наша сборка Mesa
-настроена с `prefix=/out/usr`, поэтому драйвер искал driconf в
-`/out/usr/share/drirc.d` — такого каталога нет, и ни одной опции turnip не
-прочиталось. `vulkaninfo` этого не показывал: имя его движка не `vkd3d`,
-поэтому оба драйвера сообщают `Preserve32 = false`.
+`00-turnip-defaults.conf` **только для движка `vkd3d`**. Путь к driconf
+зашивается в бинарник из `prefix` сборки, и наша сборка была с
+`prefix=/out/usr` — драйвер искал `/out/usr/share/drirc.d`, которого на
+устройстве нет. Пакетный драйвер собран с `prefix=/usr` и читает
+`/usr/share/drirc.d`. `vulkaninfo` этого не показывал: имя его движка не
+`vkd3d`, поэтому оба драйвера сообщают `Preserve32 = false`.
 
-Проверено: `VKD3D_SHADER_MODEL=6_6` на патченом драйвере — игра идёт
-(`results/game-patched-sm66.log`); тот же драйвер с `DRIRC_CONFIGDIR`,
-поднявшим `tu_enable_softfloat32`, отдаёт `shaderDenormPreserveFloat32 = true`.
-Разбор — раздел 10 дока.
+**Игра работает.** Проверено тремя прогонами: `VKD3D_SHADER_MODEL=6_6` на
+патченом драйвере (`results/game-patched-sm66.log`); `DRIRC_CONFIGDIR` на том
+же драйвере — SM 6.6 поднимается сам, форс не применяется
+(`results/game-patched-drirc.log`); сток с `VKD3D_FEATURE_LEVEL=12_0`
+(`results/game-stock-flforce.log`).
+
+Разбор — раздел 10 дока. Правка сборки (`--prefix=/usr`) внесена в
+`scripts/build-turnip.sh`, но **пересборка с ней ещё не проверена**; рабочие
+варианты сейчас — `DRIRC_CONFIGDIR` в `run-game.sh` и `~/.drirc`.
 
 Ещё не проверено: реакция vkd3d на `VK_ERROR_FEATURE_NOT_PRESENT` при
 mutable+sparse без format list — три пробы (E, F, B), которые на стоке

@@ -817,10 +817,70 @@ $ DRIRC_CONFIGDIR=/tmp/opencode/drirc-test vulkaninfo   # patched
 а не `"."` — у `vulkaninfo` `engineName` пустая строка, а `.` требует один
 символ и не матчится.
 
-### 10.4. Что это значит и что чинить
+### 10.4. Откуда берётся путь и почему он разошёлся
 
-Отказ игры — не в наших патчах и не в vkd3d. Патчи 0004–0006 честно подняли
-12_0; окно появлялось из-за того, что сборка Mesa для тестов ставилась с
-`prefix=/out/usr` и потому читала пустой driconf. Правится либо указанием
-`DRIRC_CONFIGDIR=/usr/share/drirc.d` при запуске, либо сборкой с
-`-Ddatadir=/usr/share`, чтобы путь был правильным без переменной окружения.
+Путь не вычисляется, а **зашивается в бинарник на этапе сборки**:
+`src/util/meson.build:421` выводит `-DDATADIR=join_paths(prefix, datadir)`,
+и единственное использование этого макроса во всём дереве — `xmlconfig.c:1375`.
+Проверяется прямо в библиотеке:
+
+```
+$ grep -a -o '/usr/share/drirc\.d' /usr/lib64/libvulkan_freedreno.so
+/usr/share/drirc.d
+$ grep -a -o '/out/usr/share/drirc\.d' build/out/libvulkan_freedreno.so
+/out/usr/share/drirc.d
+```
+
+Пакетная сборка образа идёт через `rpmbuild` (`packages/mesa/build.sh:70`),
+и в spec у Fedora `prefix=/usr` — отсюда `/usr/share/drirc.d`. Наша сборка
+ставилась с `--prefix=/out/usr`: это staging-каталог контейнера, а не реальный
+префикс установки, и на устройстве `/out` вообще не существует.
+
+Так что это не баг драйвера и не вина патчей: несовпадение префикса сборки с
+тем, куда реально ставится пакет.
+
+### 10.5. Что чинить
+
+Отказ игры — не в патчах 0004–0006 и не в vkd3d. Окно появлялось из-за пустого
+driconf. Три способа, все закрывают одну и ту же причину:
+
+| способ | где | состояние |
+|---|---|---|
+| `--prefix=/usr` в `scripts/build-turnip.sh` | сборка | правка внесена, **пересборка не проверена** |
+| `DRIRC_CONFIGDIR=/usr/share/drirc.d` | `scripts/run-game.sh` | проверено, игра идёт |
+| `~/.drirc` с тем же блоком | пользовательский конфиг | проверено, `Preserve32 = true` |
+
+Правка `--prefix=/usr` безопасна тем, что `DATADIR` в дереве больше нигде не
+используется — поменяется только путь к driconf. `SYSCONFDIR` (тот же приём,
+`meson.build:418`) даст `/etc/drirc`, которого тоже нет, но это
+`parseOneConfigFile` на необязательный файл, а не `parseConfigDir`.
+
+Выбран правильный способ — `--prefix=/usr`: он убирает причину, а не
+последствие, и работает при любом запуске, включая обычный запуск игры из
+Heroic, где ни `DRIRC_CONFIGDIR`, ни наш скрипт не задаются. Остальные два
+оставлены как запасные и как способ проверить гипотезу без пересборки.
+
+`~/.drirc` дублирует блок `<engine engine_name_match="vkd3d">` из
+`/usr/share/drirc.d` и читается после системных каталогов, так что на пакетный
+драйвер не влияет. Условие `vkd3d` в нём намеренно не пустое: softfloat32
+эмулируется и стоит производительности, Mesa прямо не советует включать его
+всем подряд — так что обычные DX11-игры через DXVK не затрагиваются.
+
+### 10.6. Как проверять
+
+```bash
+# 1. путь в библиотеке (после пересборки)
+grep -a -o '/usr/share/drirc\.d' /var/home/armada/opencode/build/out/libvulkan_freedreno.so
+
+# 2. опция подхватывается без DRIRC_CONFIGDIR
+env -u DRIRC_CONFIGDIR VK_DRIVER_FILES=.../build/out/freedreno_icd.json vulkaninfo \
+  | grep shaderDenormPreserveFloat32        # ждём true
+
+# 3. игра поднимается без форса SM
+scripts/run-game.sh patched 200
+grep "Enabling support for SM 6.6" results/raw/game-patched.log
+```
+
+Оговорка про шаг 2: `vulkaninfo` не сообщает имя движка, поэтому при проверке
+через него движковый блок не применяется — оценивать надо итоговое свойство,
+а не факт чтения файла.
