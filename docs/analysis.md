@@ -623,7 +623,7 @@ winevulkan переводит win32-поверхность игры (у DXVK в 
 Исправления:
 
 - `scripts/build-turnip.sh`: `-Dplatforms=x11,wayland` — тот же набор, что в
-  пакетной сборке образа (`packages/mesa-x86/build.sh`);
+  пакетной сборке образа (`image-build/mesa-x86-build.sh`);
 - `container/Containerfile.mesa-build`: добавлены WSI-зависимости
   (`libxcb-devel`, `libX11-devel`, `libxshmfence-devel`, `xcb-util-keysyms-devel`,
   `wayland-devel`, `wayland-protocols-devel`). Без них мезон падает на проверке
@@ -641,8 +641,8 @@ winevulkan переводит win32-поверхность игры (у DXVK в 
 скорее всего, был именно этим. В `scripts/build-turnip.sh` стоит проверка на
 запущенный Wine перед стартом сборки.
 
-Совпадает и build-скрипт самого образа: `packages/mesa-x86/build.sh` в
-`keks2293/armada` собирает turnip с `-Dplatforms=x11,wayland`, то есть
+Совпадает и build-скрипт самого образа: `image-build/mesa-x86-build.sh`
+(копия recipe) собирает turnip с `-Dplatforms=x11,wayland`, то есть
 пакетный драйвер WSI имеет, и расхождение было только в quick-start сборке
 здесь. Оттуда же полезное на будущее: pressure-vessel делает `dlopen`-инспекцию
 каждого provider-ICD и молча выкидывает тот, у которого не резолвится
@@ -848,7 +848,7 @@ $ grep -a -o '/out/usr/share/drirc\.d' build/out/libvulkan_freedreno.so
 /out/usr/share/drirc.d
 ```
 
-Пакетная сборка образа идёт через `rpmbuild` (`packages/mesa/build.sh:70`),
+Пакетная сборка образа идёт через `rpmbuild` (`image-build/build.sh:70`),
 и в spec у Fedora `prefix=/usr` — отсюда `/usr/share/drirc.d`. Наша сборка
 ставилась с `--prefix=/out/usr`: это staging-каталог контейнера, а не реальный
 префикс установки, и на устройстве `/out` вообще не существует.
