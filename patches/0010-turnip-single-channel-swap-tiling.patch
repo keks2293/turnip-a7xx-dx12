@@ -1,7 +1,9 @@
 Список форматов, где одноканальный формат спорит с многоканальным: оставить тайлинг
 
-Наложить поверх patches/0005-turnip-mutable-uniform-swap-tiling.patch
-(именно он добавляет tu6_format_list_swaps_are_uniform()).
+Связи: требует patches/0005-turnip-mutable-uniform-swap-tiling.patch — тот
+добавляет tu6_format_list_swaps_are_uniform(), а этот патч расширяет её
+правило. Без 0005 не применяется (контекст в tu_formats.cc) и
+семантически бессмыслен.
 
 Что не так. Функция требует, чтобы swap всех форматов списка совпадал, и
 одно-единственный R32_UINT в списке в этом виноват: B8G8R8A8_UNORM несёт WXYZ,
