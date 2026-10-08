@@ -1398,7 +1398,86 @@ CSV: `results/fps-abbase.csv`, `fps-abtp.csv`, `fps-abgc.csv`; логи
   (`freedreno_dev_info.h:394`). Проп не «пустой»: на a740 он обязан
   оставаться `False` (значение под blob v6xx).
 
-### 15.5 Итог
+### 15.5 Серия автотюна, draw states и преамбул (30.09)
+
+Вторая серия env-переключателей, уже без пересборки драйвера. Протокол как
+в 15.4 (`HUDLOG=120`, `p25` по кадрам `fps < 30`), два круга (второй —
+обратным порядком), конфиги чередуются с базой внутри дня. База за день:
+12.2 / 12.7 / 12.6, то есть шум серии ±0.3. vkmark той же серии
+(`results/vkmark-ab-autotune.txt`) весь в шуме: 0.053–0.059 мс на всех
+четырёх конфигах.
+
+| конфиг | p25 (среднее) | прогоны | Δ к базе |
+|---|---|---|---|
+| base | 12.5 | 12.2, 12.7, 12.6 | — |
+| `TU_AUTOTUNE_ALGO=profiled` | 12.6 | 12.5, 12.7 | 0 |
+| `TU_AUTOTUNE_FLAGS=big_gmem` | 11.05 | 11.1, 11.0 | **−1.5** |
+| `TU_MAX_DRAW_STATES=64` | 12.7 | 12.7, 12.7 | 0 |
+| `64 + TU_AUTOTUNE_FLAGS=preempt_optimize` | 12.6 | 12.6, 12.6 | 0 |
+| `TU_FORCE_PROPS=load_inline_uniforms_via_preamble_ldgk` | 12.6 | 12.6, 12.6 | 0 |
+
+CSV: `results/fps-at-*.csv` (соответствие имён конфигам — в
+`results/series-autotune.txt`; ошибочно подписанный `fps-at-bigb.csv` —
+лишний прогон базы), логи `results/game-patched-at-*.log`.
+
+- **`big_gmem` стабильно хуже на 1.5 кадра (~12%)**: занимать больше GMEM
+  на проход этой игры вредно. Антирекомендация.
+- **`profiled` = 0**: профилируемый алгоритм автотюна не находит ничего
+  лучше базового — тайлинг-решения уже правильные.
+- **`TU_MAX_DRAW_STATES=64` сам по себе no-op.** Проп (`max_draw_states`,
+  «The amount of valid draw state IDs», `freedreno_dev_info.h:484`;
+  a740 наследует 32 от `a6xx_base`, `freedreno_devices.py:152`, gen3-шаблон
+  ставит 64 на `:901`) читается в дереве в единственном месте —
+  `tu_autotune.cc:339`: он геит `mod_flag::PREEMPT_OPTIMIZE` в
+  поддерживаемых флагах автотюна, условие
+  `max_draw_states > TU_DRAW_STATE_AT_WRITE_RP_HASH`. Порог = `COUNT+1`
+  = (19 статических + 13 dynamic) + 1 = **33**: при 32 условие ложно (флаг
+  при задании вырезается на `tu_autotune.cc:319`), при 64 — истинно.
+  То есть 64 — ровно то число, которым gen3 открывает preempt-оптимизацию
+  автотюна, а отдельная переменная `TU_MAX_DRAW_STATES` нужна потому, что
+  проп числовой (`tu_device.cc:1708`).
+- **Комбо `64 + preempt_optimize` = 0** — сам флаг кадр не двигает.
+- **`load_inline_uniforms_via_preamble_ldgk` = 0.** Корректность перед
+  замером: `results/test-preamble-iu.log` байт-в-байт совпадает с
+  `results/test-props2-base.log` (сравнение без строк `TU_FORCE_PROPS`).
+  `load_shader_consts_via_preamble` в серии не замерялся: его порча
+  воспроизведена отдельным прогоном — все чтения `0x00000000`, раздел 14.3.
+
+### 15.6 drirc: `tu_override_uncached_as_cache_coherent`
+
+Эта опция не в `TU_FORCE_PROPS` — она дриконфная, и во **всех** игровых
+логах, включая стоковый драйвер, есть строки
+`ATTENTION: default value of option ... overridden by environment`. Источник
+найден: FEX внутри proton-cachyos-11.0-arm64 вызывает
+`__wine_set_unix_env("tu_override_uncached_as_cache_coherent", "true")`
+(строка зашита в `files/lib/wine/aarch64-windows/libwow64fex.dll` и
+`libarm64ecfex.dll`), то есть значение всегда `true`, независимо от
+драйвера. Своё `false` FEX не перетирает (проверено по
+`/proc/<pid>/environ` wine-процессов), поэтому A/B возможен простым
+переменной окружения.
+
+Семантика (`tu_device.cc:1887`, `tu_knl.cc:57`): при опции каждая
+аллокация, запрошенная как `DEVICE_LOCAL|HOST_VISIBLE|HOST_COHERENT`
+(«некешированная» по умолчанию — сюда попадают UPLOAD-ки vkd3d-proton),
+перенаправляется на тип `+HOST_CACHED`. Тип существует (vulkaninfo:
+`memoryTypes[1]` = `DL|HV|HC|CACHED`), то есть опция «живая».
+
+Протокол как в 15.5, чередование внутри дня:
+
+| прогон | p25 | медиана | n |
+|---|---|---|---|
+| `=false` (offA) | 11.6 | 11.6 | 90 |
+| по умолчанию, `true` (base6) | 12.6 | 12.7 | 90 |
+| `=false` (offB) | 11.7 | 11.7 | 88 |
+| по умолчанию, `true` (base7) | 12.6 | 12.7 | 87 |
+
+**Выключение опции хуже на 1.0 кадр (~8%)**, оба переключения
+согласованы, шум серии ±0.3. Cached-coherent host-память под FEX быстрее
+некешированной — выключать опцию нельзя, замерять больше нечего.
+CSV: `results/fps-at-{offA,base6,offB,base7}.csv`, серия —
+`results/series-drirc.txt`.
+
+### 15.7 Итог
 
 Ни одно свойство gen1/gen3 на a740 включать не нужно. Из 28 gen3-свойств
 и 5 gen1 в `TU_FORCE_PROPS` реально попадают только 10 (список —
@@ -1409,7 +1488,13 @@ CSV: `results/fps-abbase.csv`, `fps-abtp.csv`, `fps-abgc.csv`; логи
 | ломает | `load_shader_consts_via_preamble`, `ubwc_all_formats_compatible` | порча в тесте (разделы 14.3 и 14.5) |
 | 0 / шум | `has_gmem_vpc_attr_buf`, `ubwc_coherency_quirk`, `has_compliant_dp4acc`, `has_persistent_counter`, `has_abs_bin_mask`, `cs_lock_unlock_quirk` | тест и vkmark без отличий |
 | синтетика, в игре 0% | `has_generic_clear`, `r8g8_faulty_fast_clear_quirk` | разделы 15.2 и 15.4 |
+| 0 в игре | `load_inline_uniforms_via_preamble_ldgk` | тест ок, замер: раздел 15.5 |
 | порча в игре | `enable_tp_ubwc_flag_hint` | раздел 15.4 |
+
+Дополнительно проверены не пропы, а переключатели алгоритма/размерности
+(автотюн, `TU_MAX_DRAW_STATES`, дриконф `tu_override_uncached_as_cache_coherent`)
+— все нули, кроме вредного `big_gmem`; drirc-опция наоборот полезна
+(выключение хуже на 8%) — разделы 15.5 и 15.6.
 
 Остальные gen3-свойства в `TU_FORCE_PROPS` не входят вовсе — включить их
 можно только правкой `freedreno_devices.py`. По коду две из них на a740
