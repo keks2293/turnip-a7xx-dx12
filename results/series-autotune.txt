@@ -1,0 +1,62 @@
+Серия автотюна/state на RE4, 2026-09-30
+протокол: HUDLOG=120, scripts/run-game.sh patched 150, p25 по кадрам fps<30
+(метрика и отрезок — раздел 15.4 analysis.md; шум серии: база за день
+давала 12.2 / 12.7 / 12.6, то есть ±0.3)
+
+Круг 1, порядок base → profiled → bigmem → mds64:
+  base      p25=12.2 med=12.4 n=91
+  profiled  p25=12.5 med=12.6 n=91   (TU_AUTOTUNE_ALGO=profiled)
+  bigmem    p25=11.1 med=11.2 n=92   (TU_AUTOTUNE_FLAGS=big_gmem)
+  mds64     p25=12.7 med=12.7 n=87   (TU_MAX_DRAW_STATES=64)
+
+Круг 2, обратный порядок + preempt_optimize дважды (по краям):
+  preempt   p25=12.6 med=12.6 n=93   (mds64 + TU_AUTOTUNE_FLAGS=preempt_optimize)
+  bigb      p25=12.7 med=12.7 n=92   ← ПЕРЕИМЕНОВАНИЕ: это base (прогон без
+                                         env из-за ошибки в скрипте круга)
+  mds64b    p25=12.7 med=12.7 n=90
+  bigb2     p25=11.0 med=11.1 n=91   (= bigmem)
+  profb     p25=12.7 med=12.7 n=90   (= profiled)
+  baseb     p25=12.6 med=12.7 n=92   (= base)
+  preempt2  p25=12.6 med=12.7 n=91
+
+Отдельный прогон (корректность перед замером — байт-в-байт с
+test-props2-base.log, раздел 15.6 analysis.md):
+  iu, iu2   p25=12.6 / 12.6           (TU_FORCE_PROPS=load_inline_uniforms_via_preamble_ldgk)
+
+Сводка по конфигам (среднее p25, отклонение от базы 12.5):
+  base      12.5  (12.2, 12.7, 12.6)
+  profiled  12.6  (12.5, 12.7)          0
+  bigmem    11.05 (11.1, 11.0)          -1.5   ← стабильно хуже
+  mds64     12.7  (12.7, 12.7)          0      (проп сам по себе no-op, см. ниже)
+  preempt   12.6  (12.6, 12.6)          0
+  ldgk      12.6  (12.6, 12.6)          0
+
+vkmark той же серии: results/vkmark-ab-autotune.txt — все четыре конфига
+в шуме (0.053–0.059 мс), сравнение только внутри этой серии.
+
+Соответствие имён файлов конфигам (осторожно: в круге 2 была ошибка
+в имени прогона base):
+  fps-at-base.csv, fps-at-bigb.csv, fps-at-baseb.csv = base (3 прогона)
+  fps-at-profiled.csv, fps-at-profb.csv   = profiled
+  fps-at-bigmem.csv, fps-at-bigb2.csv     = bigmem
+  fps-at-mds64.csv, fps-at-mds64b.csv     = mds64
+  fps-at-preempt.csv, fps-at-preempt2.csv = mds64+preempt_optimize
+  fps-at-iu.csv, fps-at-iu2.csv           = load_inline_uniforms_via_preamble_ldgk
+
+Выводы:
+- TU_AUTOTUNE_ALGO=profiled ничего не даёт — тайлинг-решения базового
+  алгоритма уже правильные для этой игры.
+- TU_AUTOTUNE_FLAGS=big_gmem стабильно хуже на 1.5 кадра (почти на 12%):
+  увеличивать занятый GMEM на проход здесь вредно. Антирекомендация.
+- TU_MAX_DRAW_STATES=64 сам по себе no-op: в дереве проп читается только
+  в tu_autotune.cc:339 как гейт mod_flag::PREEMPT_OPTIMIZE, а порог
+  TU_DRAW_STATE_AT_WRITE_RP_HASH = TU_DRAW_STATE_COUNT+1 = 33. При
+  дефолтных 32 условие ложно, при 64 истинно — то есть 64 включает только
+  доступность флага preempt_optimize (значение из шаблона a7xx_gen3,
+  freedreno_devices.py:901; a740 наследует 32 от a6xx_base:152).
+- Комбо mds64 + preempt_optimize даёт 0 — preempt-оптимизация кадр не
+  двигает.
+- load_inline_uniforms_via_preamble_ldgk даёт 0 при байт-в-байт
+  корректности теста.
+- load_shader_consts_via_preamble не замерялся: порча воспроизведена
+  (все чтения 0x00000000, см. раздел 14.3).

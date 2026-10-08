@@ -42,8 +42,8 @@
 | 15 | `has_ray_intersection` | bool | — | True | True | False | Whether the ray_intersection instruction is present. | Наличие инструкции `ray_intersection` (пересечение лучей) — база для ray tracing. |
 | 16 | `has_generic_clear` | bool | — | — | True | False | Whether a single clear blit could be used for both sysmem and gmem. | Один clear-blit подходит и для sysmem, и для GMEM → generic clear вместо чип-специфичного. Точки: `tu_clear_blit.cc:4013` (`use_generic_clear_for_image_clear`), `:4030` (event vs cp blit), `:4051` (flush `CCU_INVALIDATE_COLOR\|WAIT_FOR_IDLE`), `:4866` (`tu_clear_attachments_generic`), `tu_cmd_buffer.cc:6690/719` (отдельные clear-ы не эмитятся), `tu_pass.cc:560` (отключается условная load/store), `tu_query_pool.cc:1574` (`CCU_INVALIDATE_DEPTH`). **Включён по умолчанию для gen2 вместе с #17 — патч 0008**; замеры: синтетика −61…−65%, RE4 0%, кадры без порчи (раздел 15 `analysis.md`). |
 | 17 | `r8g8_faulty_fast_clear_quirk` | bool | — | — | True | False | Whether r8g8 UBWC fast-clear work correctly. | Обратный флаг: UBWC fast-clear для **R8G8 работает некорректно**, поэтому guard в `use_generic_clear_for_image_clear` запрещает generic clear для `image_is_r8g8` (`tu_clear_blit.cc:3008,4013`). Единственный guard на R8G8. Смысл только в паре с #16: без generic clear условие (`has_generic_clear && !(quirk && image_is_r8g8)`) ложно в любом случае, то есть квирк один — no-op. **В паре включён по умолчанию для gen2 — патч 0008**: пара бесплатна (0% в vkmark и RE4), а без квирка очистки R8G8 generic-путём дают GPU fault (fast-clear + размеры типа 960x540 + GMEM renderpass). |
-| 18 | `load_shader_consts_via_preamble` | bool | — | — | True | — | — | Константы шейдера и bindless base addresses грузятся в preamble, а не отдельным draw-state CONST (`tu_cmd_buffer.cc:1827,7530,7548`). |
-| 19 | `load_inline_uniforms_via_preamble_ldgk` | bool | — | — | True | — | — | Inline UBO (дескрипторная память) загружается инструкцией `LDGK` из preamble (`tu_shader.cc:1097,1307`, `tu_cmd_buffer.cc:7674,7735`). |
+| 18 | `load_shader_consts_via_preamble` | bool | — | — | True | — | — | Константы шейдера и bindless base addresses грузятся в preamble, а не отдельным draw-state CONST (`tu_cmd_buffer.cc:1827,7530,7548`). **На a740 портит**: форс даёт `0x00000000` на всех чтениях теста (раздел 14.3 `analysis.md`; воспроизведено 30.09 — битва и в комбинации с #19, и один). |
+| 19 | `load_inline_uniforms_via_preamble_ldgk` | bool | — | — | True | — | — | Inline UBO (дескрипторная память) загружается инструкцией `LDGK` из preamble (`tu_shader.cc:1097,1307`, `tu_cmd_buffer.cc:7674,7735`). Тест байт-в-байт совпадает с эталоном, игровой замер (30.09, RE4) — **0** (раздел 15.5 `analysis.md`). |
 | 20 | `has_gmem_vpc_attr_buf` | bool | — | — | True | False | — | Включает отдельный VPC attribute buffer; эмитится в начале и при смене CCU-состояния (`tu_cmd_buffer.cc:598,739,2332,2450`). |
 | 21 | `sysmem_vpc_attr_buf_size` | uint32_t | — | — | 0x20000 | 0 | Size of various in-gmem caches: | Размер VPC attr buf в режиме sysmem (`fd6_gmem_cache.h:92,99`). |
 | 22 | `gmem_vpc_attr_buf_size` | uint32_t | — | — | 0xc000 | 0 | — | Размер VPC attr buf в режиме GMEM (`fd6_gmem_cache.h:84,102`); программируется в `VPC_ATTR_BUF_GMEM_SIZE` (`tu_cmd_buffer.cc:607`). |
@@ -103,6 +103,9 @@ r8g8_faulty_fast_clear_quirk
   (раздел 15.4 `analysis.md`); в vkmark и тесте порчи нет.
 - `ubwc_all_formats_compatible` и `load_shader_consts_via_preamble` в форсе
   дают порчу (проверено тестом `rp6-vkd3d-sparse-test`).
+- `load_inline_uniforms_via_preamble_ldgk` — «преамбульный» проп, который
+  проходит проверку: тест байт-в-байт совпадает с эталоном, в игре 0
+  (раздел 15.5 `analysis.md`).
 - `ubwc_coherency_quirk` добавлен в список ради проверки, не уберёт ли он порчу
   от `ubwc_all_formats_compatible` — не уберёт: комбо даёт байт-в-байт тот же
   лог, что и `ubwc_all_formats_compatible` один (раздел 14.4 `analysis.md`).

@@ -1,0 +1,37 @@
+vkmark A/B, 2026-09-30, серия autotune/state (чередование 4 конфигов, round1 прямой, round2 обратный)
+окно 1280x800, winsys xcb, present=immediate, сцены clear/vertex/shading/texture
+метрика: FrameTime мс, меньше = лучше; пересборки нет — всё через env
+конфиги: base — без флагов; profiled — TU_AUTOTUNE_ALGO=profiled;
+         bigmem — TU_AUTOTUNE_FLAGS=big_gmem; mds64 — TU_MAX_DRAW_STATES=64
+base clear 0.057
+base vertex 0.053
+base shading 0.058
+base texture 0.056
+profiled clear 0.058
+profiled vertex 0.053
+profiled shading 0.059
+profiled texture 0.056
+bigmem clear 0.058
+bigmem vertex 0.054
+bigmem shading 0.056
+bigmem texture 0.056
+mds64 clear 0.058
+mds64 vertex 0.053
+mds64 shading 0.057
+mds64 texture 0.057
+mds64 clear 0.059
+mds64 vertex 0.054
+mds64 shading 0.059
+mds64 texture 0.057
+bigmem clear 0.059
+bigmem vertex 0.054
+bigmem shading 0.059
+bigmem texture 0.057
+profiled clear 0.059
+profiled vertex 0.054
+profiled shading 0.059
+profiled texture 0.057
+base clear 0.059
+base vertex 0.054
+base shading 0.059
+base texture 0.057

@@ -1,0 +1,300 @@
+# date: 2026-09-30T12:45:21+08:00
+# VK_DRIVER_FILES=/var/home/armada/opencode/turnip-a7xx-dx12/../build/out/freedreno_icd.json
+# DRIRC_CONFIGDIR=<unset>
+# MANGOHUD=1
+# MANGOHUD_CONFIG=autostart_log,log_interval=1000,log_duration=120,output_folder=/tmp/opencode/mangologs
+# devices (name | sparseResidencyImage2D):
+#   Turnip Adreno (TM) 740  | true
+# ---
+ProtonFixes[107300] INFO: Running protonfixes on "cachyos-11.0-20260703-slr", build at 2026-07-21 23:36:49+00:00.
+ProtonFixes[107300] INFO: Running checks
+ProtonFixes[107300] INFO: All checks successful
+ProtonFixes[107300] INFO: Using early stage global defaults for UNKNOWN (4)
+ProtonFixes[107300] INFO: No early stage global protonfix found for UNKNOWN (4)
+[2026-09-30 12:45:22.886] [MANGOHUD] [info] [cpu.cpp:636] hwmon: using input: /sys/class/hwmon/hwmon19/temp1_input
+ProtonFixes[107300] INFO: Setting up FSR4 version default.
+ProtonFixes[107300] INFO: Automatic FSR4 upgrade enabled.
+ProtonFixes[107300] INFO: Running protonfixes on "cachyos-11.0-20260703-slr", build at 2026-07-21 23:36:49+00:00.
+ProtonFixes[107300] INFO: Running checks
+ProtonFixes[107300] INFO: All checks successful
+ProtonFixes[107300] INFO: Using main stage global defaults for UNKNOWN (4)
+ProtonFixes[107300] INFO: No main stage global protonfix found for UNKNOWN (4)
+ntsync: up and running.
+[2026-09-30 12:45:31.142] [MANGOHUD] [info] [blacklist.cpp:86] process 'explorer.exe' is blacklisted in MangoHud
+ATTENTION: default value of option tu_override_uncached_as_cache_coherent overridden by environment.
+ATTENTION: default value of option tu_override_uncached_as_cache_coherent overridden by environment.
+[2026-09-30 12:45:39.462] [MANGOHUD] [info] [cpu.cpp:636] hwmon: using input: /sys/class/hwmon/hwmon19/temp1_input
+warn:  CreateDXGIFactory2: Ignoring flags
+info:  Game: re4.exe
+info:  DXVK: v3.0.2-2-g0ff9cd328ca23b4
+info:  Build: aarch64 clang 22.1.8
+info:  Vulkan: Found vkGetInstanceProcAddr in winevulkan.dll @ 0x6ffff95e0cc0
+info:  Extension providers:
+info:    Platform WSI
+info:    OpenVR
+info:  OpenVR: could not open registry key, status 2
+warn:  OpenVR: Failed to initialize OpenVR
+info:    OpenXR
+warn:  OpenXR: Unable to get required Vulkan instance extensions size
+info:  Enabled instance extensions:
+info:    VK_KHR_get_surface_capabilities2
+info:    VK_KHR_surface
+info:    VK_KHR_surface_maintenance1
+info:    VK_KHR_win32_surface
+ATTENTION: default value of option tu_override_uncached_as_cache_coherent overridden by environment.
+info:  Found device: Turnip Adreno (TM) 740 (turnip Mesa driver 26.2.3)
+warn:  OpenXR: Unable to get required Vulkan Device extensions size
+warn:  DxgiAdapter::QueryInterface: Unknown interface query
+warn:  f0db4c7f-fe5a-42a2-bd62-f2a6cf6fc83e
+18418.984:0138:013c:warn:vkd3d-proton:openvr_instance_extensions: Failed to open VR registry key, status 2.
+18418.984:0138:013c:warn:vkd3d-proton:openxr_vulkan_extensions: Failed to get OpenXR extensions size from wineopenxr.
+18418.984:0138:013c:info:vkd3d-proton:vkd3d_instance_apply_application_workarounds: Program name: "re4.exe" (hash: 30ea40305615e978)
+18418.984:0138:013c:info:vkd3d-proton:vkd3d_instance_apply_application_workarounds: Detected game re4.exe, adding shader quirks for specific shaders.
+18418.985:0138:013c:info:vkd3d-proton:vkd3d_instance_deduce_config_flags_from_environment: shader_cache is used, global_pipeline_cache is enforced.
+18418.985:0138:013c:info:vkd3d-proton:vkd3d_config_flags_init_once: VKD3D_CONFIG=''.
+18418.987:0138:013c:info:vkd3d-proton:vkd3d_get_vk_version: vkd3d-proton - applicationVersion: 3.1.0.
+18418.987:0138:013c:info:vkd3d-proton:vkd3d_instance_init: vkd3d-proton - build: 3dfc6f07d0953b1.
+ATTENTION: default value of option tu_override_uncached_as_cache_coherent overridden by environment.
+18419.020:0138:013c:warn:vkd3d-proton:openvr_device_extensions: Failed to open VR registry key, status 2.
+18419.020:0138:013c:warn:vkd3d-proton:openxr_vulkan_extensions: Failed to get OpenXR extensions size from wineopenxr.
+18419.113:0138:013c:info:vkd3d-proton:vkd3d_physical_device_info_init_maint9: Implementation supports eliding QFOT for non-compressed optimal images.
+18419.113:0138:013c:info:vkd3d-proton:vkd3d_init_device_caps: Not all relevant pipeline stages are supported by EXT_dgc. Skipping.
+18419.121:0138:013c:warn:vkd3d-proton:d3d12_device_create_vkd3d_queues: Could not allocate an out of band queue for queue family 0. All out of band work will happen on the in band queue.
+18419.121:0138:013c:warn:vkd3d-proton:d3d12_device_create_vkd3d_queues: Could not allocate an out of band queue for queue family 5. All out of band work will happen on the in band queue.
+18419.123:0138:013c:info:vkd3d-proton:vkd3d_memory_info_decide_hvv_usage: Topology: UMA-like topology.
+18419.123:0138:013c:info:vkd3d-proton:vkd3d_memory_info_upload_hvv_memory_properties: Topology: HVV usage is allowed, using DEVICE_LOCAL | HOST_COHERENT for UPLOAD.
+18419.124:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Device supports VK_EXT_mutable_descriptor_type.
+18419.124:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+18419.124:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+18419.124:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+18419.128:0138:013c:info:vkd3d-proton:d3d12_device_caps_init_shader_model: Enabling support for SM 6.6.
+18419.128:0138:013c:warn:vkd3d-proton:d3d12_device_caps_init_feature_options1: No device info available for TotalLaneCount = 4096.
+18419.128:0138:013c:fixme:vkd3d-proton:d3d12_device_caps_init_feature_options1: TotalLaneCount = 4096, may be inaccurate.
+18419.128:0138:013c:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Remapping VKD3D_SHADER_CACHE to: vkd3d-proton.cache.
+18419.128:0138:013c:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Attempting to load disk cache from: vkd3d-proton.cache.
+18419.129:0138:013c:warn:vkd3d-proton:d3d12_device_create: Feature level 0xc100 is not supported.
+18419.130:0138:0168:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Performing async setup of stream archive ...
+18419.130:0138:0168:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_merge: No write cache exists. No need to merge any disk caches.
+18419.131:0138:0168:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Merging pipeline libraries took 0.574 ms.
+18419.131:0138:0168:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Mapping read-only cache took 0.747 ms.
+18419.131:0138:0168:info:vkd3d-proton:d3d12_pipeline_library_read_blob_stream_format: Device teardown request received, stopping parse early.
+18419.131:0138:0168:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Parsing stream archive took 0.011 ms.
+18419.131:0138:0168:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Done performing async setup of stream archive.
+18419.144:0138:013c:warn:vkd3d-proton:openvr_instance_extensions: Failed to open VR registry key, status 2.
+18419.144:0138:013c:warn:vkd3d-proton:openxr_vulkan_extensions: Failed to get OpenXR extensions size from wineopenxr.
+18419.147:0138:013c:info:vkd3d-proton:vkd3d_get_vk_version: vkd3d-proton - applicationVersion: 3.1.0.
+18419.147:0138:013c:info:vkd3d-proton:vkd3d_instance_init: vkd3d-proton - build: 3dfc6f07d0953b1.
+ATTENTION: default value of option tu_override_uncached_as_cache_coherent overridden by environment.
+18419.191:0138:013c:warn:vkd3d-proton:openvr_device_extensions: Failed to open VR registry key, status 2.
+18419.191:0138:013c:warn:vkd3d-proton:openxr_vulkan_extensions: Failed to get OpenXR extensions size from wineopenxr.
+18419.271:0138:013c:info:vkd3d-proton:vkd3d_physical_device_info_init_maint9: Implementation supports eliding QFOT for non-compressed optimal images.
+18419.271:0138:013c:info:vkd3d-proton:vkd3d_init_device_caps: Not all relevant pipeline stages are supported by EXT_dgc. Skipping.
+18419.276:0138:013c:warn:vkd3d-proton:d3d12_device_create_vkd3d_queues: Could not allocate an out of band queue for queue family 0. All out of band work will happen on the in band queue.
+18419.277:0138:013c:warn:vkd3d-proton:d3d12_device_create_vkd3d_queues: Could not allocate an out of band queue for queue family 5. All out of band work will happen on the in band queue.
+18419.279:0138:013c:info:vkd3d-proton:vkd3d_memory_info_decide_hvv_usage: Topology: UMA-like topology.
+18419.279:0138:013c:info:vkd3d-proton:vkd3d_memory_info_upload_hvv_memory_properties: Topology: HVV usage is allowed, using DEVICE_LOCAL | HOST_COHERENT for UPLOAD.
+18419.279:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Device supports VK_EXT_mutable_descriptor_type.
+18419.279:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+18419.279:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+18419.279:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+18419.280:0138:013c:info:vkd3d-proton:d3d12_device_caps_init_shader_model: Enabling support for SM 6.6.
+18419.280:0138:013c:warn:vkd3d-proton:d3d12_device_caps_init_feature_options1: No device info available for TotalLaneCount = 4096.
+18419.280:0138:013c:fixme:vkd3d-proton:d3d12_device_caps_init_feature_options1: TotalLaneCount = 4096, may be inaccurate.
+18419.280:0138:013c:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Remapping VKD3D_SHADER_CACHE to: vkd3d-proton.cache.
+18419.280:0138:013c:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Attempting to load disk cache from: vkd3d-proton.cache.
+18419.284:0138:0170:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Performing async setup of stream archive ...
+18419.284:0138:0170:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_merge: No write cache exists. No need to merge any disk caches.
+18419.284:0138:0170:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Merging pipeline libraries took 0.140 ms.
+18419.285:0138:0170:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Mapping read-only cache took 0.372 ms.
+18419.285:0138:0170:info:vkd3d-proton:d3d12_pipeline_library_read_blob_stream_format: Device teardown request received, stopping parse early.
+18419.285:0138:0170:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Parsing stream archive took 0.011 ms.
+18419.285:0138:0170:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Done performing async setup of stream archive.
+18419.300:0138:013c:warn:vkd3d-proton:openvr_instance_extensions: Failed to open VR registry key, status 2.
+18419.300:0138:013c:warn:vkd3d-proton:openxr_vulkan_extensions: Failed to get OpenXR extensions size from wineopenxr.
+18419.302:0138:013c:info:vkd3d-proton:vkd3d_get_vk_version: vkd3d-proton - applicationVersion: 3.1.0.
+18419.302:0138:013c:info:vkd3d-proton:vkd3d_instance_init: vkd3d-proton - build: 3dfc6f07d0953b1.
+ATTENTION: default value of option tu_override_uncached_as_cache_coherent overridden by environment.
+18419.328:0138:013c:warn:vkd3d-proton:openvr_device_extensions: Failed to open VR registry key, status 2.
+18419.329:0138:013c:warn:vkd3d-proton:openxr_vulkan_extensions: Failed to get OpenXR extensions size from wineopenxr.
+18419.405:0138:013c:info:vkd3d-proton:vkd3d_physical_device_info_init_maint9: Implementation supports eliding QFOT for non-compressed optimal images.
+18419.405:0138:013c:info:vkd3d-proton:vkd3d_init_device_caps: Not all relevant pipeline stages are supported by EXT_dgc. Skipping.
+18419.410:0138:013c:warn:vkd3d-proton:d3d12_device_create_vkd3d_queues: Could not allocate an out of band queue for queue family 0. All out of band work will happen on the in band queue.
+18419.410:0138:013c:warn:vkd3d-proton:d3d12_device_create_vkd3d_queues: Could not allocate an out of band queue for queue family 5. All out of band work will happen on the in band queue.
+18419.413:0138:013c:info:vkd3d-proton:vkd3d_memory_info_decide_hvv_usage: Topology: UMA-like topology.
+18419.413:0138:013c:info:vkd3d-proton:vkd3d_memory_info_upload_hvv_memory_properties: Topology: HVV usage is allowed, using DEVICE_LOCAL | HOST_COHERENT for UPLOAD.
+18419.413:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Device supports VK_EXT_mutable_descriptor_type.
+18419.413:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+18419.413:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+18419.413:0138:013c:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+18419.414:0138:013c:info:vkd3d-proton:d3d12_device_caps_init_shader_model: Enabling support for SM 6.6.
+18419.414:0138:013c:warn:vkd3d-proton:d3d12_device_caps_init_feature_options1: No device info available for TotalLaneCount = 4096.
+18419.414:0138:013c:fixme:vkd3d-proton:d3d12_device_caps_init_feature_options1: TotalLaneCount = 4096, may be inaccurate.
+18419.414:0138:013c:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Remapping VKD3D_SHADER_CACHE to: vkd3d-proton.cache.
+18419.414:0138:013c:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Attempting to load disk cache from: vkd3d-proton.cache.
+18419.415:0138:013c:warn:vkd3d-proton:d3d12_device_QueryInterface: {74eaee3f-2f4b-476d-82ba-2b85cb49e310} not implemented, returning E_NOINTERFACE.
+18419.416:0138:0178:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Performing async setup of stream archive ...
+18419.416:0138:0178:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_merge: No write cache exists. No need to merge any disk caches.
+18419.416:0138:0178:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Merging pipeline libraries took 0.197 ms.
+18419.416:0138:0178:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Mapping read-only cache took 0.334 ms.
+18419.433:0138:0178:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Parsing stream archive took 17.154 ms.
+18419.433:0138:0178:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Done performing async setup of stream archive.
+18419.604:0138:013c:warn:vkd3d-proton:d3d12_device_CheckFeatureSupport: Assuming device does not support tile based rendering.
+18419.604:0138:013c:warn:vkd3d-proton:d3d12_device_CheckFeatureSupport: Assuming device does not support tile based rendering.
+18419.606:0138:013c:fixme:vkd3d-proton:d3d12_command_queue_init: Global realtime priority is not implemented.
+18419.607:0138:013c:fixme:vkd3d-proton:d3d12_command_queue_init: Ignoring priority 0x2710.
+18420.975:0138:01e8:info:vkd3d-proton:dxgi_vk_swap_chain_init: Creating swapchain (1920 x 1080), BufferCount = 3.
+18421.017:0138:01e8:info:vkd3d-proton:dxgi_vk_swap_chain_init_sync_objects: Enabling frame latency handles.
+18421.017:0138:01e8:info:vkd3d-proton:dxgi_vk_swap_chain_init_sync_objects: Ensure maximum latency of 3 frames with KHR_present_wait.
+18421.017:0138:01e8:info:vkd3d-proton:dxgi_vk_swap_chain_init_sleep_state: Timer interval is 1.0 ms.
+warn:  DXGI: MakeWindowAssociation: Ignoring flags
+18421.593:0138:0160:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8G8_UINT, but using integer format is not supported.
+18421.593:0138:0160:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8G8_UINT, but using integer format is not supported.
+18421.603:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18421.616:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18421.668:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18421.705:0138:015c:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8G8_UINT, but using integer format is not supported.
+18421.705:0138:015c:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8G8_UINT, but using integer format is not supported.
+18421.706:0138:015c:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8_UINT, but using integer format is not supported.
+18421.707:0138:015c:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8_UINT, but using integer format is not supported.
+18421.707:0138:015c:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R32_UINT, but using integer format is not supported.
+18421.707:0138:015c:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R32_UINT, but using integer format is not supported.
+18421.708:0138:015c:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R32_SINT, but using integer format is not supported.
+18421.708:0138:015c:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R32_SINT, but using integer format is not supported.
+18421.753:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18421.755:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18421.758:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18421.759:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18421.816:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18421.817:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18421.821:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18421.821:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.055:0138:0150:warn:vkd3d-proton:d3d12_pipeline_library_StorePipeline: Pipeline "CSWorkAroundCopyBuffer-6306a0066b9dda35" already exists.
+18422.070:0138:015c:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8G8_UINT, but using integer format is not supported.
+18422.070:0138:015c:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8G8_UINT, but using integer format is not supported.
+18422.078:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.094:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.133:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.159:0138:0180:info:vkd3d-proton:dxgi_vk_swap_chain_recreate_swapchain_in_present_task: Got 3 swapchain images.
+[2026-09-30 12:45:49.813] [MANGOHUD] [error] [file_utils.cpp:47] Error opening directory '/sys/class/powercap/': No such file or directory
+[2026-09-30 12:45:49.813] [MANGOHUD] [error] [cpu.cpp:794] Failed to initialize CPU power data
+18422.169:0138:0160:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8G8_UINT, but using integer format is not supported.
+18422.169:0138:0160:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8G8_UINT, but using integer format is not supported.
+18422.169:0138:0160:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8_UINT, but using integer format is not supported.
+18422.170:0138:0160:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R8_UINT, but using integer format is not supported.
+18422.170:0138:0160:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R32_UINT, but using integer format is not supported.
+18422.170:0138:0160:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R32_UINT, but using integer format is not supported.
+18422.170:0138:0160:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R32_SINT, but using integer format is not supported.
+18422.170:0138:0160:err:vkd3d-proton:d3d12_pipeline_state_validate_blend_state: Enabling blending on RT 0 with format DXGI_FORMAT_R32_SINT, but using integer format is not supported.
+18422.271:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.271:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.278:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.278:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.302:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.302:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.310:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.312:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18422.313:0138:0150:warn:vkd3d-proton:d3d12_pipeline_library_StorePipeline: Pipeline "CSWorkAroundClearBuffer-abe947076e85bb3c" already exists.
+18422.364:0138:0180:info:vkd3d-proton:dxgi_vk_swap_chain_recreate_swapchain_in_present_task: Got 3 swapchain images.
+[2026-09-30 12:45:50.016] [MANGOHUD] [error] [file_utils.cpp:47] Error opening directory '/sys/class/powercap/': No such file or directory
+[2026-09-30 12:45:50.016] [MANGOHUD] [error] [cpu.cpp:794] Failed to initialize CPU power data
+18422.366:0138:01e8:info:vkd3d-proton:dxgi_vk_swap_chain_ChangeProperties: Reallocating swapchain (1152 x 720), BufferCount = 3.
+[2026-09-30 12:45:50.522] [MANGOHUD] [error] [file_utils.cpp:47] Error opening directory '/sys/class/powercap/': No such file or directory
+[2026-09-30 12:45:50.522] [MANGOHUD] [error] [cpu.cpp:794] Failed to initialize CPU power data
+[2026-09-30 12:45:51.029] [MANGOHUD] [error] [file_utils.cpp:47] Error opening directory '/sys/class/powercap/': No such file or directory
+[2026-09-30 12:45:51.029] [MANGOHUD] [error] [cpu.cpp:794] Failed to initialize CPU power data
+18423.596:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18423.761:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18423.799:0138:0160:warn:vkd3d-proton:d3d12_device_validate_shader_meta: Attempting to use FP64 operations in shader f9390ad89db03123, but this is not supported.
+18423.802:0138:0160:warn:vkd3d-proton:d3d12_device_validate_shader_meta: Attempting to use FP64 operations in shader f9390ad89db03123, but this is not supported.
+18423.814:0138:0160:err:vkd3d-proton:vkd3d_pipeline_state_desc_from_d3d12_stream_desc: Cannot deduce pipeline type from shader stages 0x0.
+18423.814:0138:0160:err:vkd3d-proton:vkd3d_pipeline_state_desc_from_d3d12_stream_desc: Cannot deduce pipeline type from shader stages 0x0.
+18423.814:0138:0160:err:vkd3d-proton:vkd3d_pipeline_state_desc_from_d3d12_stream_desc: Cannot deduce pipeline type from shader stages 0x0.
+[2026-09-30 12:45:51.531] [MANGOHUD] [error] [file_utils.cpp:47] Error opening directory '/sys/class/powercap/': No such file or directory
+[2026-09-30 12:45:51.531] [MANGOHUD] [error] [cpu.cpp:794] Failed to initialize CPU power data
+D 254 Ran out of slots. Can't allocate more
+D 258 Ran out of slots. Can't allocate more
+18423.979:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18423.994:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.002:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.013:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.035:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.035:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.035:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.035:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.035:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.036:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.036:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.036:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.036:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.036:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.036:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.036:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.036:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.036:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.036:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.036:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.662:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.662:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.663:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.663:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.664:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.664:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.664:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.665:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.665:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18424.701:0138:0160:warn:vkd3d-proton:d3d12_device_validate_shader_meta: Attempting to use FP64 operations in shader f9390ad89db03123, but this is not supported.
+18424.704:0138:0160:warn:vkd3d-proton:d3d12_device_validate_shader_meta: Attempting to use FP64 operations in shader f9390ad89db03123, but this is not supported.
+info:  Setting display mode: 1152x720@60
+info:  Setting display mode: 1152x720@60
+18426.532:0138:0150:fixme:vkd3d-proton:dxgi_vk_swap_chain_SetGammaControl: iface 00000000cee03980, NumControlPoints 1024, pControlPoints 00000000cec324d8 stub!
+info:  Setting display mode: 2560x1440@60
+info:  Setting display mode: 2560x1440@60
+18426.748:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18426.780:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18426.796:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18426.830:0138:0150:info:vkd3d-proton:dxgi_vk_swap_chain_ChangeProperties: Reallocating swapchain (2560 x 1440), BufferCount = 3.
+18426.965:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18427.038:0138:0150:info:vkd3d-proton:dxgi_vk_swap_chain_SetTargetFrameRate: Set target frame rate to 60.0 FPS.
+18427.142:0138:0180:info:vkd3d-proton:dxgi_vk_swap_chain_recreate_swapchain_in_present_task: Got 3 swapchain images.
+info:  Setting display mode: 1280x800@60
+info:  Setting display mode: 1280x800@60
+info:  Restoring display mode: 2560x1440@60
+info:  Setting display mode: 2560x1440@60
+18429.022:0138:0150:fixme:vkd3d-proton:dxgi_vk_swap_chain_SetGammaControl: iface 00000000cee03980, NumControlPoints 0, pControlPoints 0000000000000000 stub!
+18429.030:0138:0150:info:vkd3d-proton:dxgi_vk_swap_chain_ChangeProperties: Reallocating swapchain (1280 x 800), BufferCount = 3.
+18429.210:0138:0180:info:vkd3d-proton:dxgi_vk_swap_chain_recreate_swapchain_in_present_task: Got 3 swapchain images.
+18429.413:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+D 260 Ran out of slots. Can't allocate more
+D 264 Ran out of slots. Can't allocate more
+18430.382:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18430.394:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+D 268 Ran out of slots. Can't allocate more
+D 26C Ran out of slots. Can't allocate more
+18448.849:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18448.910:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18448.953:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18448.997:0138:0160:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+18449.034:0138:015c:warn:vkd3d-proton:d3d12_pipeline_state_init_graphics_create_info: DSV format is DXGI_FORMAT_UNKNOWN.
+[2026-09-30 12:47:49.859] [MANGOHUD] [info] [logging.cpp:79] /tmp/opencode/mangologs/re4_2026-09-30_12-45-49_summary.csv
+Traceback (most recent call last):
+  File "/usr/share/steam/compatibilitytools.d/proton-cachyos-11.0-arm64/proton", line 2457, in <module>
+    rc = g_session.run()
+  File "/usr/share/steam/compatibilitytools.d/proton-cachyos-11.0-arm64/proton", line 2397, in run
+    rc = self.run_proc(adverb + argv + sys.argv[2:] + self.cmdlineappend)
+  File "/usr/share/steam/compatibilitytools.d/proton-cachyos-11.0-arm64/proton", line 2346, in run_proc
+    return subprocess.call(args, env=local_env, stderr=self.log_file, stdout=self.log_file)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 398, in call
+    return p.wait(timeout=timeout)
+           ~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 1279, in wait
+    return self._wait(timeout=timeout)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 2084, in _wait
+    (pid, sts) = self._try_wait(0)
+                 ~~~~~~~~~~~~~~^^^
+  File "/usr/lib64/python3.14/subprocess.py", line 2042, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+                 ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+# [свёрнуто 12 строк: d3d12_pipeline_library_load_pipeline ... does not exist]
