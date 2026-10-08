@@ -92,9 +92,17 @@ export VK_LOADER_DEBUG="${VK_LOADER_DEBUG:-error,warn}"
 # переменной MANGOHUD=1 — по умолчанию выключен, как и положено.
 #
 #   HUD=1    оверлей на экране
-#   HUDLOG=N оверлей + CSV в $HUD_DIR: N секунд лога, сэмпл раз в секунду.
+#   HUDLOG=N оверлей + CSV в $HUD_DIR: N секунд лога.
 #            Нужно потому, что с экрана FPS не считать, а для сравнения
 #            прогонов нужны числа, а не картинка.
+#
+# HUDINTERVAL — период сэмпла в мс, по умолчанию 1000 (раз в секунду).
+# Исторически было жёстко 1000, и этого мало: за 150 с прогона выходит
+# n≈85 сэмплов, а разброс p50 между заведомо эквивалентными прогонами
+# достигает 24–43 мс (docs/analysis.md, раздел 15 и results/fps-patched-*.csv).
+# На таком шуме разделить эффект меньше ~40% невозможно в принципе, поэтому
+# для сравнений по frametime задавать 100 (n≈1500). Для прежних серий
+# поведение не меняется — значение по умолчанию то же.
 #
 # Логи MangoHud пишутся в /tmp (tmpfs) намеренно: папка игры на exFAT, а CSV
 # каждый прогон на несколько сотен строк — на exFAT это лишние записи.
@@ -104,7 +112,7 @@ if [ -n "${HUDLOG:-}" ]; then
     rm -rf "$HUD_DIR"
     mkdir -p "$HUD_DIR"
     export MANGOHUD=1
-    export MANGOHUD_CONFIG="autostart_log,log_interval=1000,log_duration=${HUDLOG},output_folder=${HUD_DIR}"
+    export MANGOHUD_CONFIG="autostart_log,log_interval=${HUDINTERVAL:-1000},log_duration=${HUDLOG},output_folder=${HUD_DIR}"
 elif [ -n "${HUD:-}" ]; then
     export MANGOHUD=1
 fi
