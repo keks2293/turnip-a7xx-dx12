@@ -1,3 +1,8 @@
+0006: тип FD6_UBWC_B8G8R8A8_INT в compat-таблице freedreno_ubwc.h.
+
+Связи: самостоятельный. Тот же файл правят 0011 и 0012 (другие строки
+enum и switch) — все три применяются вместе без конфликтов.
+
 diff --git a/src/freedreno/common/freedreno_ubwc.h b/src/freedreno/common/freedreno_ubwc.h
 index a85ea6f26a3..45cb608db87 100644
 --- a/src/freedreno/common/freedreno_ubwc.h

@@ -1,3 +1,9 @@
+0005: uniform-список остаётся tiled (upstream-TODO в tu_formats.cc).
+
+Связи: самостоятельный; расширяется патчем 0010 — тот переписывает
+добавленную здесь tu6_format_list_swaps_are_uniform(), поэтому без 0005
+патч 0010 не применяется.
+
 diff --git a/src/freedreno/vulkan/tu_formats.cc b/src/freedreno/vulkan/tu_formats.cc
 index c0c9480dbe2..e10960b7be5 100644
 --- a/src/freedreno/vulkan/tu_formats.cc

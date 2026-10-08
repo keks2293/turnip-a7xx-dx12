@@ -1,3 +1,8 @@
+0008: gen2 по умолчанию has_generic_clear + r8g8_faulty_fast_clear_quirk
+(таблица устройств freedreno_devices.py).
+
+Связи: нет — правит только таблицу устройств.
+
 diff --git a/src/freedreno/common/freedreno_devices.py b/src/freedreno/common/freedreno_devices.py
 index 31831ea8c37..00c57969407 100644
 --- a/src/freedreno/common/freedreno_devices.py
