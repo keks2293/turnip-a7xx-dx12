@@ -29,9 +29,15 @@ case "$MODE" in
   patched)
     [ -r "$PATCHED_ICD" ] || { echo "нет $PATCHED_ICD — собрать: scripts/build-turnip.sh" >&2; exit 1; }
     export VK_DRIVER_FILES="$PATCHED_ICD"
+    # Сборка Mesa у нас с prefix=/out/usr, поэтому драйвер ищет driconf в
+    # /out/usr/share/drirc.d и не находит ничего: ни одной опции turnip, включая
+    # tu_enable_softfloat32. Без неё shaderDenormPreserveFloat32 = false, vkd3d не
+    # даёт SM 6.2 → 6.6, и игра отказывает окном «your GPU was not supported».
+    # Пакетный драйвер читает /usr/share/drirc.d сам; путь указываем только тут.
+    [ -d "$DRICONSYSCONFDIR" ] || export DRIRC_CONFIGDIR=/usr/share/drirc.d
     ;;
   stock)
-    unset VK_DRIVER_FILES || true
+    unset VK_DRIVER_FILES DRIRC_CONFIGDIR || true
     ;;
   *) echo "usage: $0 [stock|patched] [timeout-sec]" >&2; exit 1 ;;
 esac
@@ -79,6 +85,7 @@ echo
 {
   echo "# date: $(date -Is)"
   echo "# VK_DRIVER_FILES=${VK_DRIVER_FILES:-<unset>}"
+  echo "# DRIRC_CONFIGDIR=${DRIRC_CONFIGDIR:-<unset>}"
   echo "# devices (name | sparseResidencyImage2D):"
   vulkaninfo 2>/dev/null | awk '
     /deviceName/ { dev=$3" "$4" "$5" "$6" "$7 }
