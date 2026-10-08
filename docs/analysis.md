@@ -674,6 +674,57 @@ winevulkan переводит win32-поверхность игры (у DXVK в 
 конца прогона (код 124 — наш таймаут), ни одного `err:`, ни одного
 `Exception` в логе, и в шапке лога `sparseResidencyImage2D | true`.
 
+### Почему остаётся 0xc100 (12_1): одна нереализованная расширка (04.10.2026)
+
+Выше §9 назвал условие 12_1 «`ROVsSupported` + `ConservativeRasterizationTier >= 1`»
+и отнёс его вне задачи. Теперь раскрыто до конца — по исходникам vkd3d-proton
+(`libs/vkd3d/device.c`, master от 04.10.2026) и замерам на устройстве.
+
+Каскад `max_feature_level` в `d3d12_device_init_caps()`:
+
+    11_0 → 11_1 (OutputMergerLogicOp + storage-слоты)
+        → 12_0 (TiledResourcesTier >= 2, ResourceBindingTier >= 2,
+                TypedUAVLoadAdditionalFormats)
+        → 12_1 (ROVsSupported && ConservativeRasterizationTier >= 1)
+        → 12_2 (SM 6_5, RT 1_1, mesh, VRS tier 2, conservative tier 3, ...)
+
+У нас выполнено всё, кроме `ROVsSupported`:
+
+- **ConservativeRasterizationTier >= 1** — выполняется. Требует
+  `EXT_conservative_rasterization`, Turnip включает его при `chip >= 7`
+  (`tu_device.cc:312`), и пакетная 26.2.3, и наша сборка его экспонируют
+  (замер `vulkaninfo` 04.10; `degenerateTrianglesRasterized = true`, то есть
+  tier не ниже 1, а по функции `d3d12_device_determine_conservative_rasterization_tier()`
+  это как минимум 2).
+- **`ROVsSupported` = `fragmentShaderPixelInterlock && fragmentShaderSampleInterlock`**
+  из `VK_EXT_fragment_shader_interlock` (`device.c:9270`). Это **не**
+  rast-order-access: `VK_EXT/ARM_rasterization_order_attachment_access` у Turnip
+  есть, но vkd3d для ROV их не считывает.
+- **`VK_EXT_fragment_shader_interlock` в Turnip не реализовано.** Замер по ICD
+  (`vulkaninfo` с `VK_DRIVER_FILES`, 04.10): `freedreno_icd` — 0, строку в
+  системном выводе даёт `lvp_icd` (lavapipe). В дереве `src/freedreno` — ни
+  одного следа, при том что SPIR-V/NIR-инфраструктура есть
+  (`spirv_to_nir.c:7339`, `SpvOpBeginInvocationInterlockEXT`).
+
+Статус в апстриме Mesa (gitlab API, 04.10.2026): реализовано у RADV
+(MR 22250, через HW-примитив PoPS — `radv_has_pops`), ANV (включается
+безусловно), lavapipe и zink; у nvk — открытый MR 38206. По Turnip — ни MR,
+ни issue.
+
+Вывод: 12_1 упирается ровно в одну нереализованную в Turnip расширку.
+Публично задокументированного interlock-примитива у Adreno нет, поэтому
+честная реализация — эмуляция: spinlock-таблица по хэшу пикселя в глобальной
+памяти плюс fence (в ir3 есть и атомики в fragment-шейдерах, и инструкция
+`fence`), с открытыми вопросами: дедлок, если вызов убит внутри секции, и
+helper-invocations. Включение флагов без lowering было бы ложью о капсе.
+Отдельного решения заслуживает и то, что потребитель واحد — `ROVsSupported`
+для флага 12_1, — а RE4 ROV не использует и работает на 12_0.
+
+Форс существует (`VKD3D_FEATURE_LEVEL=12_1`, `d3d12_device_caps_override()`:
+ставит `ROVsSupported = TRUE` и `max_feature_level = 0xc100`), но это обман
+капсов; проверка «опций» сделана замером расширений и чтением кода vkd3d, без
+него.
+
 ### Что осталось нерешённым
 
 Игра до окна не дошла: за 200 с не появилось `dxgi_vk_swap_chain_init`
