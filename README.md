@@ -128,9 +128,10 @@ Containerfile в `container/`). От `-Dplatforms=` в `scripts/build-turnip.sh`
 (`results/game-patched-drirc.log`); сток с `VKD3D_FEATURE_LEVEL=12_0`
 (`results/game-stock-flforce.log`).
 
-Разбор — раздел 10 дока. Правка сборки (`--prefix=/usr`) внесена в
-`scripts/build-turnip.sh`, но **пересборка с ней ещё не проверена**; рабочие
-варианты сейчас — `DRIRC_CONFIGDIR` в `run-game.sh` и `~/.drirc`.
+Разбор — раздел 10 дока. Правка сборки (`--prefix=/usr` в
+`scripts/build-turnip.sh`) убирает причину: драйвер читает тот же
+`/usr/share/drirc.d`, что и пакетный, и SM 6.6 поднимается сам при любом
+запуске — из Heroic, из консоли, из наших скриптов.
 
 Ещё не проверено: реакция vkd3d на `VK_ERROR_FEATURE_NOT_PRESENT` при
 mutable+sparse без format list — три пробы (E, F, B), которые на стоке
