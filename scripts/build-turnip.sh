@@ -14,6 +14,15 @@
 #      win32-поверхность игры в поверхность хоста, и без этих расширений
 #      DXVK падает на vkCreateInstance: "Failed to create Vulkan instance".
 #      Нужен полный набор, как в пакетной сборке образа: -Dplatforms=x11,wayland.
+#   4. --prefix обязан быть /usr. Из prefix+datadir мeson выводит -DDATADIR,
+#      а единственное его использование в драйвере - путь к driconf
+#      (src/util/xmlconfig.c:1375, parseConfigDir(DATADIR "/drirc.d")).
+#      С --prefix=/out/usr драйвер искал конфиг в /out/usr/share/drirc.d,
+#      которого на устройстве нет, и не читал ни одной опции turnip.
+#      В частности терялась tu_enable_softfloat32, а без неё
+#      shaderDenormPreserveFloat32 = false, vkd3d не поднимает SM 6.6, и
+#      DX12-игра отказывает окном "your GPU was not supported" на 12_0.
+#      Проверяется строкой в бинарнике: grep -a -o '/usr/share/drirc\.d'.
 set -euxo pipefail
 
 cd /src
@@ -29,7 +38,7 @@ fi
 
 meson setup build \
     --buildtype=release \
-    --prefix=/out/usr \
+    --prefix=/usr \
     -Dopengl=false \
     -Dplatforms=x11,wayland \
     -Dgallium-drivers= \
