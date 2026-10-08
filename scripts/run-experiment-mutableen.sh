@@ -24,7 +24,7 @@ grep -n "ubwc_all_formats_compatible" src/freedreno/common/freedreno_devices.py
 echo "### пересборка драйвера (инкрементально: кодогенерация + линковка)"
 podman run --rm -v "$MESA:/src:Z" -v "$WORK:/out:Z" \
     localhost/mesa-build-fedora44-full \
-    bash -c 'cd /src && ninja -C build -j6 src/freedreno/vulkan/libvulkan_freedreno.so \
+    bash -c 'cd /src && ninja -C build -j"$(nproc)" src/freedreno/vulkan/libvulkan_freedreno.so \
              && cp build/src/freedreno/vulkan/libvulkan_freedreno.so /out/out/'
 
 echo "### положительный контроль: флаг попал в сгенерированную таблицу"
@@ -36,7 +36,7 @@ idx = re.findall(r'\{[^}]*0x43050a01[^}]*\}, "FD740", &(__info\d+)', t)[0]
 props = recs[idx][recs[idx].find('.props={'):recs[idx].find('},.magic')]
 hit = [n for n, b in recs.items() if 'ubwc_all_formats_compatible=True' in b]
 print(f"FD740 = {idx}; записей с флагом: {len(hit)} из {len(recs)}")
-assert 'ubwc_all_formats_compatible=True' in props, "флаг НЕ попал - эксперим��нт не состоялся"
+assert 'ubwc_all_formats_compatible=True' in props, "флаг НЕ попал - эксперимент не состоялся"
 print("OK: флаг включён для нашего устройства")
 PY
 
@@ -49,7 +49,7 @@ echo "### откат и контрольный прогон (флаг выклю
 cd "$MESA" && git checkout src/freedreno/common/freedreno_devices.py
 podman run --rm -v "$MESA:/src:Z" -v "$WORK:/out:Z" \
     localhost/mesa-build-fedora44-full \
-    bash -c 'cd /src && ninja -C build -j6 src/freedreno/vulkan/libvulkan_freedreno.so \
+    bash -c 'cd /src && ninja -C build -j"$(nproc)" src/freedreno/vulkan/libvulkan_freedreno.so \
              && cp build/src/freedreno/vulkan/libvulkan_freedreno.so /out/out/'
 cd "$WORK"
 ./run-test.sh "$WORK/out/freedreno_icd.json" "$WORK/test-patched.log" >/dev/null 2>&1 || true

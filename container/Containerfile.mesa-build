@@ -3,5 +3,12 @@ RUN dnf -y install \
         meson ninja-build gcc gcc-c++ pkgconf \
         python3-mako python3-ply python3-yaml \
         libdrm-devel expat-devel zlib-devel libxml2-devel \
-        vulkan-headers \
+        vulkan-headers ccache \
     && dnf clean all
+
+# ccache ускоряет цикл «патч -> пересборка» (scripts/rebuild-turnip-msm.sh),
+# который иначе каждый раз компилирует Mesa заново. Кэш общий и переживает
+# пересоздание контейнера, если смонтировать ~/.cache/ccache.
+ENV CCACHE_DIR=/ccache
+ENV CC="ccache gcc"
+ENV CXX="ccache g++"
