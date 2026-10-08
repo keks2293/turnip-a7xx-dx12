@@ -1,0 +1,16 @@
+diff --git a/src/freedreno/common/freedreno_devices.py b/src/freedreno/common/freedreno_devices.py
+index 31831ea8c37..47b1b09ce0b 100644
+--- a/src/freedreno/common/freedreno_devices.py
++++ b/src/freedreno/common/freedreno_devices.py
+@@ -848,6 +848,11 @@ a7xx_gen2 = GPUProps(
+         stsc_duplication_quirk = True,
+         has_event_write_sample_count = True,
+         ubwc_unorm_snorm_int_compatible = True,
++        # EXPERIMENT ONLY - NOT FOR COMMIT. Checks whether gen2 (A740)
++        # implements MUTABLEEN. Upstream enables the flag only for gen3,
++        # justified by "A750+ added a special flag"; the bit itself is
++        # declared variants="A7XX-", i.e. also for gen2.
++        ubwc_all_formats_compatible = True,
+         supports_uav_ubwc = True,
+         fs_must_have_non_zero_constlen_quirk = True,
+         # Most devices with a740 have blob v6xx which doesn't have

@@ -1,0 +1,7 @@
+FROM docker.io/library/fedora:44
+RUN dnf -y install \
+        meson ninja-build gcc gcc-c++ pkgconf \
+        python3-mako python3-ply python3-yaml \
+        libdrm-devel expat-devel zlib-devel libxml2-devel \
+        vulkan-headers \
+    && dnf clean all

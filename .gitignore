@@ -1,0 +1,5 @@
+build/
+out/
+*.o
+*.so
+rp6-vkd3d-sparse-test
