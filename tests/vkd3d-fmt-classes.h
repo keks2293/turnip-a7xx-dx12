@@ -54,6 +54,17 @@ static const struct vkd3d_fmt_class vkd3d_fmt_classes[] = {
     { "B8G8R8X8_TYPELESS", { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_SRGB }, 2 },
     { "B8G8R8X8_UNORM", { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_SRGB }, 2 },
     { "B8G8R8X8_UNORM_SRGB", { VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_B8G8R8A8_UNORM }, 2 },
+    /* 32-битный TYPELESS под ALLOW_UNORDERED_ACCESS: vkd3d дописывает в
+     * список R32{U,I,F} (utils.c:393-401, правило D3D11 про typed UAV
+     * loads).  Список смешанный, BGR и R32 — разные раскладки, поэтому на
+     * gen2 он уходит в linear на стоке и на всех патчах.  Это корректно,
+     * но раньше модель этого случая не видела. */
+    { "B8G8R8A8_TYPELESS+UAV", { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_SRGB,
+                                  VK_FORMAT_R32_UINT, VK_FORMAT_R32_SINT,
+                                  VK_FORMAT_R32_SFLOAT }, 5 },
+    { "B8G8R8X8_TYPELESS+UAV", { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_SRGB,
+                                  VK_FORMAT_R32_UINT, VK_FORMAT_R32_SINT,
+                                  VK_FORMAT_R32_SFLOAT }, 5 },
     { "BC1_TYPELESS", { VK_FORMAT_BC1_RGBA_UNORM_BLOCK, VK_FORMAT_BC1_RGBA_SRGB_BLOCK }, 2 },
     { "BC1_UNORM", { VK_FORMAT_BC1_RGBA_UNORM_BLOCK, VK_FORMAT_BC1_RGBA_SRGB_BLOCK }, 2 },
     { "BC1_UNORM_SRGB", { VK_FORMAT_BC1_RGBA_SRGB_BLOCK, VK_FORMAT_BC1_RGBA_UNORM_BLOCK }, 2 },
