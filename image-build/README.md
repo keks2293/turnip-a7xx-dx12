@@ -9,5 +9,5 @@ self-contained:
   RPM spec (`Patch9001–9003`) while building the image;
 - the origin of each patch and external sources — `../patches/PATCHES.md`.
 
-The patches ship in `patches/`; 0004–0011 have nothing to do with the
+The patches ship in `patches/`; 0004–0012 have nothing to do with the
 RPM recipe — they are applied to the source tree (`scripts/build-turnip.sh`).
