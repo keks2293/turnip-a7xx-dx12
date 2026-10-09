@@ -1,7 +1,7 @@
 # Patches
 
-Происхождение патчей 0001–0003 (патчи 0004–0011 — см. README, они recipe
-образа не входят). Patches applied on top of BASE.env (`../image-build/BASE.env`). Each entry's `source` is an upstream URL pinned
+Origin of patches 0001–0003 (patches 0004–0011 — see the README, they are not
+part of the image recipe). Patches applied on top of BASE.env (`../image-build/BASE.env`). Each entry's `source` is an upstream URL pinned
 to a commit, or `armada` if it's original; a URL source with no `notes` is verbatim.
 `notes` mean the file was modified.
 

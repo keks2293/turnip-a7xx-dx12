@@ -1,38 +1,39 @@
 #!/bin/bash
-# Сборка только turnip (Vulkan) из /src в /out. Запускается в контейнере.
+# Build of turnip (Vulkan) only, from /src into /out. Runs in a container.
 #
-# Три вещи, которые стоит не сломать (описаны в docs/analysis.md, разделы 6 и 9):
-#   1. KMD обязан быть msm, а не kgsl. Путь перечисления для kgsl - это
-#      open("/dev/kgsl-3d0") (tu_knl.cc), на RP6 этого узла нет, и
-#      vkEnumeratePhysicalDevices молча возвращает 0 устройств.
-#   2. Копировать надо в /out/out/, потому что /out смонтирован в корень build/,
-#      а env.sh и манифест ICD указывают на build/out/. Копия в /out/ остаётся
-#      невидимой для загрузчика, и результат выглядит как "патчи не применились".
-#   3. -Dplatforms= нельзя оставлять пустым. Пустая сборка годится для
-#      собственного теста (он не показывает окна), но в драйвере тогда нет ни
-#      VK_KHR_xcb_surface, ни VK_KHR_wayland_surface. winevulkan переводит
-#      win32-поверхность игры в поверхность хоста, и без этих расширений
-#      DXVK падает на vkCreateInstance: "Failed to create Vulkan instance".
-#      Нужен полный набор, как в пакетной сборке образа: -Dplatforms=x11,wayland.
-#   4. --prefix обязан быть /usr. Из prefix+datadir мeson выводит -DDATADIR,
-#      а единственное его использование в драйвере - путь к driconf
+# Three things not to break (described in docs/analysis.md, sections 6 and 9):
+#   1. The KMD must be msm, not kgsl. The enumeration path for kgsl is
+#      open("/dev/kgsl-3d0") (tu_knl.cc); on RP6 this node does not exist, and
+#      vkEnumeratePhysicalDevices silently returns 0 devices.
+#   2. The copy must go into /out/out/, because /out is mounted at the root of build/,
+#      and env.sh and the ICD manifest point to build/out/. A copy in /out/ stays
+#      invisible to the loader, and the result looks like "the patches were not applied".
+#   3. -Dplatforms= must not be left empty. An empty build is fine for
+#      our own test (it does not show windows), but then the driver has neither
+#      VK_KHR_xcb_surface nor VK_KHR_wayland_surface. winevulkan translates
+#      the game's win32 surface into a host surface, and without these extensions
+#      DXVK crashes at vkCreateInstance: "Failed to create Vulkan instance".
+#      The full set is needed, as in the batch image build: -Dplatforms=x11,wayland.
+#   4. --prefix must be /usr. From prefix+datadir meson derives -DDATADIR,
+#      and its only use in the driver is the path to driconf
 #      (src/util/xmlconfig.c:1375, parseConfigDir(DATADIR "/drirc.d")).
-#      С --prefix=/out/usr драйвер искал конфиг в /out/usr/share/drirc.d,
-#      которого на устройстве нет, и не читал ни одной опции turnip.
-#      В частности терялась tu_enable_softfloat32, а без неё
-#      shaderDenormPreserveFloat32 = false, vkd3d не поднимает SM 6.6, и
-#      DX12-игра отказывает окном "your GPU was not supported" на 12_0.
-#      Проверяется строкой в бинарнике: grep -a -o '/usr/share/drirc\.d'.
+#      With --prefix=/out/usr the driver looked for the config in /out/usr/share/drirc.d,
+#      which does not exist on the device, and read no turnip options at all.
+#      In particular tu_enable_softfloat32 was lost, and without it
+#      shaderDenormPreserveFloat32 = false, vkd3d does not raise SM 6.6, and a
+#      DX12 game rejects with the window "your GPU was not supported" at 12_0.
+#      Checked with a line in the binary: grep -a -o '/usr/share/drirc\.d'.
 set -euxo pipefail
 
 cd /src
 rm -rf build
 
-# Память устройства общая с GPU (7.3 ГБ всего), поэтому сборку нельзя запускать
-# одновременно с игрой: вместе они уводят систему в OOM, курсор замирает и
-# нужна перезагрузка. Проверка перед стартом - чтобы не поймать это позже.
+# Device memory is shared with the GPU (7.3 GB total), so the build cannot be run
+# at the same time as the game: together they drive the system into OOM, the cursor
+# freezes and a reboot is needed. This check runs before the start so as not to
+# hit that later.
 if pgrep -f 're4\.exe|wine|wineserver' >/dev/null 2>&1; then
-    echo "ВНИМАНИЕ: Wine/игра уже запущены. Собери драйвер, когда игра закрыта." >&2
+    echo "WARNING: Wine/the game is already running. Build the driver when the game is closed." >&2
     exit 1
 fi
 
@@ -54,33 +55,34 @@ meson setup build \
 ninja -C build -j"$(nproc)" src/freedreno/vulkan/libvulkan_freedreno.so
 
 SO=build/src/freedreno/vulkan/libvulkan_freedreno.so
-# Диагностика KMD: у msm-сборки есть импорт drmGetVersion, у kgsl вместо него
-# строки kgsl_3d0/kgsl_bo_init. Если nm недоступен - не роняем сборку, это
-# только диагностика. Символ ищем без конвейера: grep -q завершается раньше
-# nm, и под pipefail тот получает SIGPIPE, а пайплайн считается упавшим.
+# KMD diagnostics: the msm build has the drmGetVersion import, while kgsl has
+# kgsl_3d0/kgsl_bo_init strings instead. If nm is unavailable - do not fail the
+# build, this is diagnostics only. The symbol is searched without a pipeline: grep -q
+# finishes before nm, and under pipefail nm gets SIGPIPE and the pipeline is
+# considered failed.
 if UNDEF="$(nm -D --undefined-only "$SO" 2>/dev/null)"; then
     if [[ "$UNDEF" != *drmGetVersion* ]]; then
-        echo "ВНИМАНИЕ: нет импорта drmGetVersion - похоже, собран kgsl-KMD, а не msm" >&2
+        echo "WARNING: no drmGetVersion import - looks like the kgsl KMD was built, not msm" >&2
         exit 1
     fi
 else
-    echo "ВНИМАНИЕ: nm недоступен, проверку KMD пропускаю" >&2
+    echo "WARNING: nm unavailable, skipping the KMD check" >&2
 fi
 
 mkdir -p /out/out
 cp -v "$SO" /out/out/
 
-# Манифест ICD пишется здесь, а не берётся из сборки: сгенерированный мезоном
-# json содержит library_path install-пути (/out/usr/lib/...), который на
-# устройстве не существует. Нужен путь, который загрузчик увидит на устройстве.
-# По умолчанию - как в scripts/env.sh; переопределяется снаружи.
+# The ICD manifest is written here rather than taken from the build: the meson
+# generated json contains install paths for library_path (/out/usr/lib/...), which do
+# not exist on the device. A path the loader will see on the device is needed.
+# By default - as in scripts/env.sh; overridable from outside.
 DEVICE_SO="${RP6_DEVICE_SO:-/var/home/armada/opencode/build/out/libvulkan_freedreno.so}"
-# api_version и file_format_version - как у пакетного драйвера образа
-# (mesa-vulkan-drivers). Раньше здесь стояло 1.4.341, но пакетный манифест на
-# устройстве (/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json) объявляет
-# 1.4.354 - ровно ту же версию, что и сам драйвер (vulkaninfo: apiVersion =
-# 1.4.354). Занижать api_version до "1.3" не нужно: DXVK сам просит
-# VK_API_VERSION_1_3.
+# api_version and file_format_version - as in the packaged driver from the image
+# (mesa-vulkan-drivers). It used to be 1.4.341 here, but the packaged manifest on
+# the device (/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json) declares
+# 1.4.354 - exactly the same version as the driver itself (vulkaninfo: apiVersion =
+# 1.4.354). There is no need to lower api_version to "1.3": DXVK asks for
+# VK_API_VERSION_1_3 itself.
 cat > /out/out/freedreno_icd.json <<EOF
 {
     "file_format_version": "1.0.1",

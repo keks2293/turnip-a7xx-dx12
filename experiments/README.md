@@ -1,51 +1,52 @@
-# Эксперименты (НЕ для коммита)
+# Experiments (NOT FOR COMMIT)
 
-Патчи из `patches/` ship; эти — нет. Они существуют, чтобы выводы в
-`docs/analysis.md` можно было перепроверить, а не принять на веру.
+The patches from `patches/` ship; these do not. They exist so that the
+conclusions in `docs/analysis.md` can be re-checked rather than taken on faith.
 
-| Патч | Что проверяет | Результат |
+| Patch | What it checks | Result |
 |---|---|---|
-| `0001-experiment-ubwc-all-formats-compatible-a7xx-gen2.patch` | умеет ли gen2 переинтерпретировать UBWC при смене формата (бит `MUTABLEEN`) | нет: чтение через R32_UINT-вид рассыпается, `H` memreq 0x100000 → 0x102000 |
-| `0002-experiment-force-is-mutable.patch` | изоляция: ломает ли именно MUTABLEEN, или «что-то ещё включилось» | ломает именно MUTABLEEN: при неизменной паре форматов `T-tr` 0/262144 → 261120/262144 |
-| `0003-experiment-no-sparse-create-refusal.patch` | снимает ли отказ 0004 на create то, из-за чего игра на 12_0 пишет «GPU не подходит под минимальные требования» | прогон на игре, разбор в `docs/analysis.md`, раздел 9 |
-| `0004-experiment-force-wzyx-when-mutable.patch` | раскатка хака `fd6_format_table.c:396` на mutable-ветку: держать `WZYX` и при `is_mutable`. Требует 0002 — без него `is_mutable` у списков T нет | **порча от MUTABLEEN целиком в swap**: `T-tr` 261120/262144 → **0/262144**, `S-tr` 16384/16384 → **0/16384** |
-| `0005-experiment-ubwc-on-without-mutableen.patch` | UBWC включён для несовместимого списка, а `is_mutable` (то есть `MUTABLEEN`) выставлен в 0 — «бит вреден» или «возможности нет»? | **возможности нет**: `H d1'` даёт тот же мусор байт-в-байт (`0x079d685e…`), что и с битом |
-| `experiment-cross-order-list-tiled-ubwc.patch` | оставляет ли tiled+UBWC same-shape кросс-порядковый список `{BGRA8, RGBA8}` (проба S3 в тесте): механическая устойчивость и семантика кросс-вида | механически да (`S3-tr` 0/262144, база EXACT, кросс-вид детерминирован), но поведение меняется: identity → swapped (порядок каналов вида игнорирован) против стока/линей; плюс рассинхрон sparse query/create (`E`/`S2` SUCCESS при `FORMAT_NOT_SUPPORTED`) → **откат**, разбор — `docs/analysis.md`, раздел 16 |
-| `0007-experiment-nv12-keep-tiling.patch` | NV12 + MUTABLE: снять только `force_linear_tile`, оставив снятие UBWC | **да**, и перенесён в `patches/0009-turnip-nv12-mutable-keep-tiling.patch`: N2 (NV12 + MUTABLE + SPARSE) на 0004–0008 даёт `FEATURE_NOT_PRESENT`, с 0009 — `SUCCESS`. Разбор — `docs/analysis.md`, раздел 18. Оговорка: тождественность раскладки не доказывает путь сэмплирования |
-| `0008-experiment-sfloat-int-ubwc-compat.patch` | включить членов `_SFLOAT` в целочисленные UBWC compat-классы (`freedreno_ubwc.h`) | **да, по гейту**: 5 TYPELESS-классов получают `list=0x102000` (UBWC), roundtrip EXACT, с 31 до 36 классов с UBWC. Fast-clear не покрыт байтовым roundtrip — оговорка. **Перенесён в `patches/0012-turnip-ubwc-compat-sfloat-int.patch`** (04.10.2026: изолированный A/B на стеке 0005–0010 меняет ровно 5 строк пробы U; оговорка про fast-clear сохранена в шапке патча). Разбор — `docs/analysis.md`, раздел 20.5 |
-| `0009-experiment-single-channel-swap-vacuous.patch` | одноканальный формат (`R32_UINT` и т.п.) не должен выводить список в linear: порядка каналов у него нет | **да, ровно 2 класса из 72** получают тайлинг (`B8G8R8A8/B8G8R8X8_TYPELESS+UAV`); BGRA8-сторона EXACT `0/262144`. Меняется видимость через `R32_UINT`-вид: обмен байта 0 и байта 2, `261120/262144` слов расходятся с linear. Кросс-порядок и NV12 не задеты. **Перенесён в `patches/0010-turnip-single-channel-swap-tiling.patch`**, оговорка про `R32`-вид — в `README.md`. Разбор — `docs/analysis.md`, раздел 21.3 |
-| `0010-experiment-is-mutable-without-ubwc.patch` | изоляция: ломает ли `is_mutable` (MUTABLEEN) сам по себе, без UBWC и без sparse — комбинация из §14 оставалась неизмеренной | **нет, стрём отказ**: `R32_UINT`-вид не изменился ни на байт, а сторона BGRA8 сломалась `261119/262144` MISMATCH. Поломка — обмен swap'а, применяемый один раз вместо двух (запись через раскладку с принудительным WZYX, чтение через вид с форматовым WXYZ). Дыра в измерениях `is_mutable` закрыта. Разбор — `docs/analysis.md`, раздел 21.4 |
-| `0011-experiment-ubwc-compat-r16-and-10bit.patch` | строки для одноканального 16-битного и packed-10-битного в `fd6_ubwc_compat_mode()`: в стоковой таблице таких форматов нет, и любой список vkd3d с `R16` или `R10G10B10A2` молча теряет UBWC | **да, по гейту, и это не перестраховка, а пробел таблицы**: проба CEIL показала, что одиночный `R16_UNORM` и `R10G10B10A2_UNORM` без списка UBWC держат (`0x82000`/`0x102000` против линейных `0x80000`/`0x100000`), то есть потолок есть и его снимает гейт. Изолированный A/B (один и тот же стек, `git apply -R`) меняет ровно 3 строки лога: `R16_TYPELESS`, `R16_UINT`, `R10G10B10A2_TYPELESS` идут из `ГЕЙТ СНЯЛ` в `гейт не мешает`. Модель считает 8 классов из 72 (с 0012). `R8_*` и `R32G32B32_*` не задеты — у них потолка нет вовсе. Содержимое под UBWC и fast-clear не проверены. **Перенесён в `patches/0011-turnip-ubwc-compat-r16-and-10bit.patch`** (шапка уже без NOT FOR COMMIT; оговорка про непроверенный контент — в `README.md`). Разбор — `docs/analysis.md`, раздел 21.6 |
+| `0001-experiment-ubwc-all-formats-compatible-a7xx-gen2.patch` | whether gen2 can reinterpret UBWC on a format change (the `MUTABLEEN` bit) | no: reading through the R32_UINT view falls apart, `H` memreq 0x100000 → 0x102000 |
+| `0002-experiment-force-is-mutable.patch` | isolation: is it MUTABLEEN itself that breaks, or "something else got switched on" | MUTABLEEN itself breaks: with the format pair unchanged, `T-tr` 0/262144 → 261120/262144 |
+| `0003-experiment-no-sparse-create-refusal.patch` | whether the 0004 create refusal removes what makes the game on 12_0 print "GPU does not meet the minimum requirements" | run on the game, analysis in `docs/analysis.md`, section 9 |
+| `0004-experiment-force-wzyx-when-mutable.patch` | rolling the `fd6_format_table.c:396` hack out to the mutable branch: keep `WZYX` also when `is_mutable`. Requires 0002 — without it the T lists have no `is_mutable` | **the MUTABLEEN corruption lies entirely in swap**: `T-tr` 261120/262144 → **0/262144**, `S-tr` 16384/16384 → **0/16384** |
+| `0005-experiment-ubwc-on-without-mutableen.patch` | UBWC enabled for an incompatible list while `is_mutable` (i.e. `MUTABLEEN`) is set to 0 — "the bit is harmful" or "the capability isn't there"? | **the capability isn't there**: `H d1'` gives the same garbage byte for byte (`0x079d685e…`) as with the bit |
+| `experiment-cross-order-list-tiled-ubwc.patch` | whether tiled+UBWC same-shape keeps a cross-order list `{BGRA8, RGBA8}` (probe S3 in the test): mechanical robustness and cross-view semantics | mechanically yes (`S3-tr` 0/262144, base EXACT, cross-view deterministic), but the behavior changes: identity → swapped (the view's channel order is ignored) vs stock/linear; plus a sparse query/create desync (`E`/`S2` SUCCESS while `FORMAT_NOT_SUPPORTED`) → **rollback**, analysis — `docs/analysis.md`, section 16 |
+| `0007-experiment-nv12-keep-tiling.patch` | NV12 + MUTABLE: drop only `force_linear_tile`, keeping the UBWC removal | **yes**, and it was moved to `patches/0009-turnip-nv12-mutable-keep-tiling.patch`: N2 (NV12 + MUTABLE + SPARSE) on 0004–0008 gives `FEATURE_NOT_PRESENT`, with 0009 — `SUCCESS`. Analysis — `docs/analysis.md`, section 18. Caveat: layout identity does not prove the sampling path |
+| `0008-experiment-sfloat-int-ubwc-compat.patch` | adding `_SFLOAT` members to the integer UBWC compat classes (`freedreno_ubwc.h`) | **yes, by the gate**: 5 TYPELESS classes get `list=0x102000` (UBWC), roundtrip EXACT, from 31 to 36 classes with UBWC. Fast-clear is not covered by the byte roundtrip — caveat. **Moved to `patches/0012-turnip-ubwc-compat-sfloat-int.patch`** (04.10.2026: an isolated A/B on the 0005–0010 stack changes exactly 5 lines of probe U; the fast-clear caveat is kept in the patch header). Analysis — `docs/analysis.md`, section 20.5 |
+| `0009-experiment-single-channel-swap-vacuous.patch` | a single-channel format (`R32_UINT` and the like) must not push the list into linear: it has no channel order | **yes, exactly 2 classes out of 72** get tiling (`B8G8R8A8/B8G8R8X8_TYPELESS+UAV`); the BGRA8 side is EXACT `0/262144`. What changes is visibility through the `R32_UINT` view: bytes 0 and 2 are swapped, `261120/262144` words disagree with linear. Cross-order and NV12 are unaffected. **Moved to `patches/0010-turnip-single-channel-swap-tiling.patch`**, the caveat about the `R32` view — in `README.md`. Analysis — `docs/analysis.md`, section 21.3 |
+| `0010-experiment-is-mutable-without-ubwc.patch` | isolation: does `is_mutable` (MUTABLEEN) break things by itself, without UBWC and without sparse — the combination from §14 had remained unmeasured | **no, the rejection is alarming**: the `R32_UINT` view did not change by a single byte, but the BGRA8 side broke — `261119/262144` MISMATCH. The breakage is swap's exchange applied once instead of twice (write through the layout with forced WZYX, read through the view with format WXYZ). The hole in the `is_mutable` measurements is closed. Analysis — `docs/analysis.md`, section 21.4 |
+| `0011-experiment-ubwc-compat-r16-and-10bit.patch` | rows for single-channel 16-bit and packed 10-bit in `fd6_ubwc_compat_mode()`: the stock table has no such formats, and any vkd3d list with `R16` or `R10G10B10A2` silently loses UBWC | **yes, by the gate, and this is not over-caution but a gap in the table**: the CEIL probe showed that a lone `R16_UNORM` and `R10G10B10A2_UNORM` hold up without a UBWC list (`0x82000`/`0x102000` vs the linear `0x80000`/`0x100000`), i.e. there is a ceiling and the gate is what lifts it. An isolated A/B (same stack, `git apply -R`) changes exactly 3 log lines: `R16_TYPELESS`, `R16_UINT`, `R10G10B10A2_TYPELESS` go from `GATE REMOVED` to `gate is not in the way`. The model counts 8 classes out of 72 (with 0012). `R8_*` and `R32G32B32_*` are unaffected — they have no ceiling at all. The contents under UBWC and fast-clear were not verified. **Moved to `patches/0011-turnip-ubwc-compat-r16-and-10bit.patch`** (the header no longer says NOT FOR COMMIT; the caveat about unverified content — in `README.md`). Analysis — `docs/analysis.md`, section 21.6 |
 
-Нумерация `experiments/` и `patches/` независимая, поэтому 0004/0005/0007/0008/0009
-встречаются в обоих каталогах. Идентификаторы для модели гейта — по смыслу,
-не по номеру патча: `--exp-0009` и `--exp-0010` в
-`scripts/fmt-list-gate-check.py` соответствуют именно этому каталогу.
+The numbering of `experiments/` and `patches/` is independent, so
+0004/0005/0007/0008/0009 appear in both directories. The identifiers for the
+gate model are by meaning, not by patch number: `--exp-0009` and `--exp-0010` in
+`scripts/fmt-list-gate-check.py` refer to this very directory.
 
-Все ложатся на дерево с патчами 0004–0006, каждый по отдельности, и
-откатываются `git apply -R <патч>`. `git checkout` для отката **не годится**:
-в `tu_image.cc` лежат незакоммиченные 0005/0006, checkout их уничтожит.
-0002 и 0005 сужены до собственного ханка, поэтому apply/-R работают поверх
-них. Второй эксперимент существует потому, что первый менял две переменные
-сразу (бит MUTABLEEN и состав списка) и сам по себе вывода о причине не давал.
+All of them apply on a tree with patches 0004–0006, each one individually, and
+are reverted with `git apply -R <patch>`. `git checkout` for reverting **is not
+usable**: uncommitted 0005/0006 sit in `tu_image.cc`, a checkout would destroy
+them. 0002 and 0005 are narrowed down to their own hunk, so apply/-R work on
+top of them. The second experiment exists because the first changed two
+variables at once (the MUTABLEEN bit and the list composition) and on its own
+gave no conclusion about the cause.
 
-Прогон: `scripts/run-experiment-mutableen.sh` (первый). Для остальных:
+Run: `scripts/run-experiment-mutableen.sh` (the first one). For the rest:
 
 ```sh
 cd $WORK/mesa-rp6
 git apply experiments/0002-experiment-force-is-mutable.patch
-# пересобрать драйвер, прогнать тест, ожидается T-tr 261120/262144
+# rebuild the driver, run the test, T-tr 261120/262144 expected
 git apply -R experiments/0002-experiment-force-is-mutable.patch
 ```
 
-0004 накладывается на 0002 (иначе swap и так `WZYX`, разница нулевая),
-0005 — сам по себе. A/B 0002 против 0002+0004 делался на одном бинаре
-теста: `results/test-expD-control.log` и `results/test-expD.log`;
+0004 is applied on top of 0002 (otherwise swap is `WZYX` anyway, the
+difference is zero), 0005 — on its own. The A/B of 0002 vs 0002+0004 was done
+on one test binary: `results/test-expD-control.log` and `results/test-expD.log`;
 0005 — `results/test-expE.log`.
 
-Прогон третьего — на игре, а не на тесте, и требует пересборки драйвера,
-поэтому порядок такой: игра закрыта, патч применён, драйвер пересобран,
-`scripts/run-game.sh patched 200`, потом `git checkout`. Сборку и игру
-одновременно не запускать — память устройства общая с GPU.
+The third one is run on the game, not on the test, and requires rebuilding the
+driver, so the order is: game closed, patch applied, driver rebuilt,
+`scripts/run-game.sh patched 200`, then `git checkout`. Do not run the build
+and the game at the same time — device memory is shared with the GPU.
 
-Логи — в `results/test-mutableen.log` и `results/test-expC.log`.
+Logs are in `results/test-mutableen.log` and `results/test-expC.log`.

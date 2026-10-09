@@ -1,23 +1,23 @@
-/* Воспроизводитель дефекта «первый fill теряет часть данных»
- * (docs/analysis.md, раздел 20).
+/* Reproducer for the defect "the first fill loses part of the data"
+ * (docs/analysis.md, section 20).
  *
- * Вопрос один: пишет ли драйвер весь образ при первом
- * vkCmdCopyBufferToImage в свежесозданный vkImage.
+ * One question only: does the driver write the whole image on the first
+ * vkCmdCopyBufferToImage into a freshly created vkImage.
  *
  *   ./repro-first-fill [reps] [cold|warm]
  *
- *   reps  сколько раз прогнать (по умолчанию 4)
- *   cold  один fill, затем замер          -- дефект воспроизводится
- *   warm  два fill подряд, замер после    -- дефекта нет
+ *   reps  how many times to run (default 4)
+ *   cold  one fill, then measurement          -- the defect reproduces
+ *   warm  two fills in a row, measurement after    -- no defect
  *
- * На каждый (rep, tiling) создаётся свежий образ и свежая память, иначе
- * второй прогон попадает в тёплый образ и даёт 0 расхождений независимо от
- * режима. Формат фиксирован R8G8B8A8_UNORM: дефект не зависит ни от формата,
- * ни от UBWC (воспроизводится и на LINEAR).
+ * For every (rep, tiling) a fresh image and fresh memory are created, otherwise
+ * the second run lands in a warm image and yields 0 mismatches regardless of
+ * the mode. The format is fixed to R8G8B8A8_UNORM: the defect depends neither on the format
+ * nor on UBWC (it reproduces on LINEAR as well).
  *
- * Ожидаемо на turnip/Adreno 740:
- *   cold: rep0 bad=5056/262144, rep1.. bad=0    (число всегда кратно 64)
- *   warm: все rep bad=0
+ * Expected on turnip/Adreno 740:
+ *   cold: rep0 bad=5056/262144, rep1.. bad=0    (the count is always a multiple of 64)
+ *   warm: all reps bad=0
  */
 #include <vulkan/vulkan.h>
 #include <stdio.h>
@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
                                  .pApplicationInfo = &ai };
     VkInstance inst;
     if (vkCreateInstance(&ici, NULL, &inst) != VK_SUCCESS) {
-        printf("нет instance\n");
+        printf("no instance\n");
         return 1;
     }
     uint32_t nd = 0;
@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
     VkPhysicalDevice *ds = malloc(nd * sizeof(*ds));
     vkEnumeratePhysicalDevices(inst, &nd, ds);
     if (!nd) {
-        printf("нет устройств\n");
+        printf("no devices\n");
         return 1;
     }
     VkPhysicalDevice pd = ds[0];
@@ -60,13 +60,13 @@ int main(int argc, char **argv) {
                                .queueCreateInfoCount = 1, .pQueueCreateInfos = &qci };
     VkDevice dev;
     if (vkCreateDevice(pd, &dci, NULL, &dev) != VK_SUCCESS) {
-        printf("нет device\n");
+        printf("no device\n");
         return 1;
     }
     VkQueue q;
     vkGetDeviceQueue(dev, 0, 0, &q);
 
-    /* HOST_VISIBLE|HOST_COHERENT: на RP6 это unified-память, flush не нужен. */
+    /* HOST_VISIBLE|HOST_COHERENT: on RP6 this is unified memory, no flush needed. */
     uint32_t fsz = UINT32_MAX;
     for (uint32_t i = 0; i < mp.memoryTypeCount; i++) {
         VkMemoryPropertyFlags want = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
         }
     }
     if (fsz == UINT32_MAX) {
-        printf("нет host-visible памяти\n");
+        printf("no host-visible memory\n");
         return 1;
     }
 
@@ -88,9 +88,9 @@ int main(int argc, char **argv) {
         w ^= (uint32_t)(i >> 11) << 24;
         pat[i] = w;
     }
-    /* нулевых слов в pat нет: полностью нулевое слово возможно только при
-     * i == 0 (0x5a5a0000 ^ 0 = 0x5a5a0000), так что любое got == 0 —
-     * это запись нуля драйвером, а не совпадение с шаблоном. */
+    /* there are no zero words in pat: a fully zero word is possible only at
+     * i == 0 (0x5a5a0000 ^ 0 = 0x5a5a0000), so any got == 0 —
+     * is the driver writing a zero, not a match with the pattern. */
 
     VkBufferCreateInfo bci = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = bytes,
                                .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
     const char *names[2] = { "OPTIMAL", "LINEAR" };
     const VkImageCreateInfo *cis[2] = { &ii, &ii_lin };
 
-    printf("режим: %s, %ux%u, R8G8B8A8_UNORM, memoryType=%u\n", warm ? "warm" : "cold", W, H, fsz);
+    printf("mode: %s, %ux%u, R8G8B8A8_UNORM, memoryType=%u\n", warm ? "warm" : "cold", W, H, fsz);
 
     size_t worst = 0;
     for (unsigned rep = 0; rep < reps; rep++) {
@@ -219,7 +219,7 @@ int main(int argc, char **argv) {
             }
             printf("rep%u %-8s memreq=0x%llx: bad=%zu/%zu zero=%zu%s\n", rep, names[t],
                    (unsigned long long)ir.size, bad, (size_t)(bytes / 4), zero,
-                   first == (size_t)-1 ? "" : " (первое битое слово есть)");
+                   first == (size_t)-1 ? "" : " (first bad word present)");
             if (bad > worst)
                 worst = bad;
             vkUnmapMemory(dev, rbm);
@@ -228,6 +228,6 @@ int main(int argc, char **argv) {
             vkFreeMemory(dev, imm, NULL);
         }
     }
-    printf("худший прогон: %zu расхождений\n", worst);
+    printf("worst run: %zu mismatches\n", worst);
     return 0;
 }

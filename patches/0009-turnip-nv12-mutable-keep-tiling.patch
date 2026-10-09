@@ -1,54 +1,61 @@
-NV12 + MUTABLE_FORMAT: не ронять образ в linear, снять только UBWC
+NV12 + MUTABLE_FORMAT: do not drop the image to linear, drop only UBWC
 
-tu_image.cc: в ветке планарного NV12 для образов с
-VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT выставлялись сразу два запрета:
+tu_image.cc: in the planar NV12 branch, images with
+VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT got two restrictions at once:
 
     ubwc_enabled = false;
     force_linear_tile = true;
 
-Первый нужен и достаточен. Второй лишний, и из-за него NV12 + MUTABLE +
-SPARSE_RESIDENTCY нельзя было создать вовсе: патч 0004 отказывает на create
-при tile_mode != TILE6_3, потому что адресация sparse-блоков описывает
-tiled-раскладку, и линейный sparse-образ молча читает не те адреса.
+The first is necessary and sufficient. The second is redundant, and
+because of it NV12 + MUTABLE + SPARSE_RESIDENTCY could not be created
+at all: patch 0004 refuses creation when tile_mode != TILE6_3, because
+sparse-block addressing describes a tiled layout, and a linear sparse
+image silently reads the wrong addresses.
 
-Почему раскладка при этом не меняется. tu_image_view_init переинтерпретирует
-ту же плоскость 0 как Y8/R8: комментарий в коде прямо называет это отличием
-сжатия ("the 0'th plane of this format has a different UBWC compression"), то
-есть переинтерпретация трактуется как тождественная по раскладке. И раскладка
-строится ровно этим же форматом: tu6_plane_format() отдаёт для плоскости 0
-PIPE_FORMAT_Y8_UNORM, и он же уходит в tu_image_init. Совпадает и базовый
-формат плоскости 1 (R8_UNORM / PIPE_FORMAT_R8_UNORM). То есть меняется только
-то, чем сжаты данные, а не геометрия плоскостей, и отдельный запрет на
-тайлинг не нужен.
+Why the layout does not change. tu_image_view_init reinterprets the
+same plane 0 as Y8/R8: the comment in the code calls this exactly a
+difference in compression ("the 0'th plane of this format has a
+different UBWC compression"), i.e. the reinterpretation is treated as
+identical in layout. And the layout is built by exactly the same
+format: tu6_plane_format() returns PIPE_FORMAT_Y8_UNORM for plane 0,
+and that same value goes into tu_image_init. The base format of plane 1
+also matches (R8_UNORM / PIPE_FORMAT_R8_UNORM). So only what the data
+is compressed with changes, not the geometry of the planes, and a
+separate tiling prohibition is unnecessary.
 
-Что это даёт, кроме снятия отказа:
+What this gives, besides removing the rejection:
 
- - NV12 + MUTABLE перестаёт быть линейным. Для видео это обычная
-   конфигурация, и демоция в linear стоит полосы и тайлинга.
- - Снимается единственный достижимый из vkd3d путь в отказ 0004, поэтому
-   патчить vkd3d не требуется.
- - Правка не в gen2-квирке, а в общем коде: UBWC-отказ остаётся (он и был
-   предметом ветки), меняется только тайлинг. На gen2/g3/a8xx эффект одинаков,
-   и 0004 продолжает работать для всех прочих путей в линейный sparse-образ.
+ - NV12 + MUTABLE stops being linear. For video this is a common
+   configuration, and the demotion to linear costs bandwidth and
+   tiling.
+ - The only path reachable from vkd3d into the 0004 rejection is
+   removed, so patching vkd3d is not required.
+ - The change is not in a gen2 quirk but in common code: the UBWC
+   refusal stays (that was the point of the branch), only tiling
+   changes. The effect is the same on gen2/g3/a8xx, and 0004 keeps
+   working for all other paths into a linear sparse image.
 
-Проверено измерением, проба N в tests/rp6-vkd3d-sparse-test.c:
+Verified by measurement, probe N in tests/rp6-vkd3d-sparse-test.c:
 
-    | сборка                    | N2: NV12+MUTABLE+SPARSE |
+    | build                     | N2: NV12+MUTABLE+SPARSE |
     |---------------------------|-------------------------|
-    | сток                      | SUCCESS                 |
+    | stock                     | SUCCESS                 |
     | 0004-0008                  | FEATURE_NOT_PRESENT     |
-    | 0004-0008 + этот патч     | SUCCESS                 |
+    | 0004-0008 + this patch    | SUCCESS                 |
 
-Признак независимый от вычисления размера: гейт 0004 в tu_image.cc отказывает
-ровно при tile_mode != TILE6_3, поэтому SUCCESS означает TILE6_3 напрямую.
+The signal is independent of size computation: the 0004 gate in
+tu_image.cc refuses exactly when tile_mode != TILE6_3, so SUCCESS means
+TILE6_3 directly.
 
-Замеры планарной раскладки (проба W) и memreq приведены в docs/analysis.md,
-раздел 18.
+Planar layout measurements (probe W) and memreq are given in
+docs/analysis.md, section 18.
 
-Upstream-пригодность: правка снимает демоцию, которая не нужна, и не добавляет
-проверок чипа, поэтому кандидат в апстрим отдельной правкой tu_image.cc.
-Связи: опирается на 0004 — снимает единственный достижимый из vkd3d путь
-в отказ, который тот вводит. Самостоятельно ложится и без 0004.
+Upstream-worthiness: the change removes an unnecessary demotion and
+adds no chip checks, so it is an upstream candidate as a separate
+tu_image.cc fix.
+Relations: builds on 0004 - it removes the only path reachable from
+vkd3d into the rejection that patch introduces. Applies standalone even
+without 0004.
 
 diff --git a/src/freedreno/vulkan/tu_image.cc b/src/freedreno/vulkan/tu_image.cc
 --- a/src/freedreno/vulkan/tu_image.cc

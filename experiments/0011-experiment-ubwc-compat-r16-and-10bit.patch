@@ -1,60 +1,61 @@
-Эксперимент 0011 - NOT FOR COMMIT. Строки для R16_* и R10G10B10A2_* в fd6_ubwc_compat_mode().
+Experiment 0011 - NOT FOR COMMIT. Rows for R16_* and R10G10B10A2_* in fd6_ubwc_compat_mode().
 
-Зачем. В стоковом fd6_ubwc_compat_mode() (src/freedreno/common/freedreno_ubwc.h)
-28 форматов с непустым случаем, и среди них нет ни одного одноканального
-16-битного и ни одного packed-10-битного. Любой список форматов, в который
-vkd3d кладёт R16 (а он кладёт его всегда, R16_TYPELESS и ещё три класса),
-из-за этого молча теряет UBWC.
+Why. In the stock fd6_ubwc_compat_mode() (src/freedreno/common/freedreno_ubwc.h)
+there are 28 formats with a non-empty case, and among them there is not a single single-channel
+16-bit one and not a single packed-10-bit one. Any format list into which
+vkd3d puts R16 (and it always puts it, R16_TYPELESS and three more classes)
+silently loses UBWC because of this.
 
-Молча - потому что fd6_ubwc_compat_mode() для них возвращает
-FD6_UBWC_UNKNOWN_COMPAT, а tu6_mutable_format_list_ubwc_compatible() на первом
-же неизвестном члене выходит с false. Дальше ветка !mutable_ubwc_fc снимает
-ubwc_enabled, и образ остаётся tiled, но не сжатым.
+Silently - because fd6_ubwc_compat_mode() returns
+FD6_UBWC_UNKNOWN_COMPAT for them, and tu6_mutable_format_list_ubwc_compatible() exits with
+false at the first unknown member. Then the !mutable_ubwc_fc branch clears
+ubwc_enabled, and the image stays tiled but not compressed.
 
-Это перестраховка, а не ограничение железа, и это измерено, а не выведено.
-Проба CEIL в tests/rp6-vkd3d-sparse-test.c (логи results/test-CEIL-base.log и
-results/test-CEIL-exp0011.log) создаёт три образа с одним и тем же списком:
-линейный, тот же формат без списка, и он же с MUTABLE. Для одиночного
-R16_UNORM без списка приходит memreq 0x82000 против линейных 0x80000, то есть
-метаданные UBWC завелись сами по себе: потолок есть, и его снимает именно гейт.
-То же для R10G10B10A2_UNORM: 0x102000 против 0x100000.
+This is over-caution, not a hardware limitation, and it is measured, not derived.
+The CEIL probe in tests/rp6-vkd3d-sparse-test.c (logs results/test-CEIL-base.log and
+results/test-CEIL-exp0011.log) creates three images with one and the same list:
+a linear one, the same format without a list, and that same one with MUTABLE. For a lone
+R16_UNORM without a list the memreq comes to 0x82000 against linear 0x80000, i.e.
+the UBWC metadata started on its own: the ceiling exists, and it is exactly the gate that
+removes it.
+The same for R10G10B10A2_UNORM: 0x102000 vs 0x100000.
 
-В отличие от эксперимента 0008 здесь не нужно утверждать, что blob
-"allows these, but not a660". Оба формата полноценны в пути текстуры: в
-fd6_format_table.c есть VTC(R16_UNORM, ..., WZYX) (строка 72) и
-FMT(R10G10B10A2_UNORM, ..., WZYX) со строкой 209, у обоих swap WZYX, то есть
-совпадающий. Пробел только в compat-таблице, и это ровно тот случай, когда
-аргумент «все варианты одного размера блока различаются только интерпретацией
-тех же битов» стоит полностью: раскладка зависит только от размера блока
-(layout->cpp = util_format_get_blocksize(), fd6_layout.c:115), как и в
-0005/0006/0008, а swap у всех членов списка общий.
+Unlike experiment 0008, here one does not need to claim that the blob
+"allows these, but not a660". Both formats are full-fledged in the texture path: in
+fd6_format_table.c there is VTC(R16_UNORM, ..., WZYX) (line 72) and
+FMT(R10G10B10A2_UNORM, ..., WZYX) at line 209, both have swap WZYX, i.e.
+matching. The gap is only in the compat table, and this is exactly the case where
+the argument "all variants of one block size differ only in the interpretation of
+the same bits" holds fully: the layout depends only on the block size
+(layout->cpp = util_format_get_blocksize(), fd6_layout.c:115), as in
+0005/0006/0008, and the swap is shared by all members of the list.
 
-Что НЕ меняется. R8_* сюда не входит намеренно: у него нет потолка вовсе.
-has_8bpp_ubwc = false на gen2 (freedreno_devices.py, обход бага порчи текста
-из 0f770caa232, "Disable 8bpp_ubwc on a6xx gen2"), и замер это подтверждает -
-nonmemreq одиночного R8_UNORM равен линейному. R32G32B32_* - тоже: 3-компонентных
-строк в blob нет и потолка замерами не видно. Эти группы блокирует
-tu6_ubwc_possible(), а не гейт, и правкой правила они не лечатся.
+What does NOT change. R8_* is deliberately not included here: it has no ceiling at all.
+has_8bpp_ubwc = false on gen2 (freedreno_devices.py, working around the text corruption bug
+from 0f770caa232, "Disable 8bpp_ubwc on a6xx gen2"), and the measurement confirms it -
+the nonmemreq of a lone R8_UNORM equals the linear one. R32G32B32_* too: there are no
+3-component rows in the blob and no ceiling is visible in measurements. These groups are blocked by
+tu6_ubwc_possible(), not the gate, and they are not fixed by patching the rule.
 
-Имя формата в switch. Очевидное имя неверно, и это стоило одной сборки:
-VK_FORMAT_A2B10G10R10_UNORM_PACK32 отображается в PIPE_FORMAT_R10G10B10A2_UNORM
-(src/vulkan/util/vk_format.c:114), а PIPE_FORMAT_A2B10G10R10_UNORM в этот switch
-не попадает никогда, хотя в p_format.h такой формат есть. В cases стоят
-имена pipe, а не вулкана.
+Format name in the switch. The obvious name is wrong, and it cost one build:
+VK_FORMAT_A2B10G10R10_UNORM_PACK32 maps to PIPE_FORMAT_R10G10B10A2_UNORM
+(src/vulkan/util/vk_format.c:114), while PIPE_FORMAT_A2B10G10R10_UNORM never gets into this switch
+at all, even though such a format exists in p_format.h. The cases hold
+pipe names, not Vulkan ones.
 
-Что остаётся за рамками эксперимента.
- - fast-clear: байтовый roundtrip не сверяет метаданные clear, как и в 0008.
- - переинтерпретация через R16_UINT-вид на списке R16_TYPELESS: ровно тот
-   механизм, что в 0010 оказался сломанным при расходящихся swap'ах. Здесь
-   swap'ы у всех R16_* совпадают (WZYX), так что асимметрии не будет, но
-   проверять надо отдельно.
- - В compat-строку добавлены только R10G10B10A2_UNORM и _UINT, потому что
-   ровно у них в fd6_format_table.c есть тайловые записи (FMT/VTC); у SNORM,
-   SINT и USCALED там V__, то есть тайлинга нет. Если vkd3d соберёт список
-   с SNORM или SINT, вопрос упрётся уже в таблицу текстурных форматов, а не
-   в гейт, и правки этого эксперимента не хватит.
+What stays outside the experiment.
+ - fast-clear: a byte roundtrip does not check the clear metadata, as in 0008.
+ - reinterpretation through an R16_UINT view on an R16_TYPELESS list: exactly the
+   mechanism that turned out broken in 0010 with diverging swaps. Here
+   the swaps of all R16_* match (WZYX), so there will be no asymmetry, but
+   it has to be tested separately.
+ - Only R10G10B10A2_UNORM and _UINT are added to the compat row, because
+   exactly they have tiled entries (FMT/VTC) in fd6_format_table.c; SNORM,
+   SINT and USCALED have V__ there, i.e. no tiling. If vkd3d builds a list
+   with SNORM or SINT, the question will already hit the texture format table rather than
+   the gate, and the fix of this experiment will not be enough.
 
-Замер и разбор: docs/analysis.md, раздел 21.6.
+Measurement and analysis: docs/analysis.md, section 21.6.
 
 diff --git a/src/freedreno/common/freedreno_ubwc.h b/src/freedreno/common/freedreno_ubwc.h
 --- a/src/freedreno/common/freedreno_ubwc.h

@@ -1,58 +1,62 @@
-0012: _SFLOAT-члены в целочисленных UBWC compat-классах fd6_ubwc_compat_mode().
+0012: _SFLOAT members in the integer UBWC compat classes of fd6_ubwc_compat_mode().
 
-Связи: самостоятельный — правит только fd6_ubwc_compat_mode()
-(src/freedreno/common/freedreno_ubwc.h). Дополняет 0006 (другие строки того же
-switch) и 0011 (другие семейства форматов): три правки одной compat-таблицы, но
-разные её части, применяются вместе без конфликтов. Механизм отличается от
-0005/0010 — те решают, останется ли список tiled, этот решает, включится ли
-UBWC вовсе (на gen2 несовместимый список снимает ubwc_enabled безусловно).
+Relations: standalone - edits only fd6_ubwc_compat_mode()
+(src/freedreno/common/freedreno_ubwc.h). Complements 0006 (other rows of
+the same switch) and 0011 (other format families): three edits of one
+compat table, but different parts of it, they apply together without
+conflicts. The mechanism differs from 0005/0010 - those decide whether a
+list stays tiled, this one decides whether UBWC turns on at all (on gen2
+an incompatible list clears ubwc_enabled unconditionally).
 
-Зачем. Сток держит каждый _FLOAT вне fd6_ubwc_compat_mode(), и для R32_FLOAT
-прямо пишет «a630 blob allows these, but not a660». a660 — это наше семейство
-gen2, так что решение осознанное, а не недосмотр. Но из-за него любой список
-форматов, в котором _SFLOAT смешан с целыми, проваливает
-tu6_mutable_format_list_ubwc_compatible() и теряет компрессию целиком.
+Why. The stock code keeps every _FLOAT out of fd6_ubwc_compat_mode(), and
+for R32_FLOAT it says outright «a630 blob allows these, but not a660».
+a660 is our gen2 family, so the decision is deliberate, not an oversight.
+But because of it, any format list in which _SFLOAT is mixed with
+integers fails tu6_mutable_format_list_ubwc_compatible() and loses
+compression entirely.
 
-Именно так устроены пять классов vkd3d, то есть ровно то, что D3D12 строит для
-TYPELESS-ресурсов (R32_TYPELESS, R16G16_TYPELESS, R32G32_TYPELESS,
-R16G16B16A16_TYPELESS, R32G32B32A32_TYPELESS). Из 70 классов vkd3d на стоке
-31 класс держит UBWC, остальные 39 теряют; этот патч поднимает 31 -> 36.
+That is exactly how five vkd3d classes are built, i.e. precisely what
+D3D12 builds for TYPELESS resources (R32_TYPELESS, R16G16_TYPELESS,
+R32G32_TYPELESS, R16G16B16A16_TYPELESS, R32G32B32A32_TYPELESS). Out of 70
+vkd3d classes, 31 hold UBWC on stock and the remaining 39 lose it; this
+patch raises 31 -> 36.
 
-Обоснование по layouts, а не по blob. UBWC-кодирование задаётся на класс
-форматов, а не на конкретный формат, и внутри одного класса различаются только
-размеры каналов. _SFLOAT-член имеет ровно ту же раскладку, что и целочисленный
-член того же typeless-формата: те же биты на канал, тот же swizzle, та же
-tiled-разметка. Каст в Vulkan — это переинтерпретация тех же битов, а не
-перестановка каналов, поэтому fast-clear и декодирование секторов не могут
-разойтись. Z32_FLOAT намеренно остаётся UNKNOWN: он не входит ни в одно
-цветное typeless-семейство, и у глубины своя семантика очистки.
+Justification by layouts, not by the blob. UBWC encoding is defined per
+format class, not per concrete format, and within one class only the
+channel sizes differ. An _SFLOAT member has exactly the same layout as
+the integer member of the same typeless format: same bits per channel,
+same swizzle, same tiled markup. A Vulkan cast is a reinterpretation of
+the same bits, not a channel permutation, so fast-clear and sector
+decoding cannot diverge. Z32_FLOAT deliberately stays UNKNOWN: it belongs
+to no color typeless family, and depth has its own clear semantics.
 
-Что не проверяется этим патчем (и остаётся риском): драйвер не сверяет
-содержимое метаданных UBWC fast-clear с интерпретацией формата, так что
-ошибочное значение clear может проявиться только там, где приложение делает
-fast-clear через view в float-интерпретации. Байтового roundtrip это не
-ловит.
+What this patch does not check (and remains a risk): the driver does not
+compare the contents of the UBWC fast-clear metadata against the format
+interpretation, so a wrong clear value can only show up where an
+application does a fast-clear through a view with float interpretation.
+A byte roundtrip does not catch this.
 
-Замер на Adreno 740 (chip_id 0x43050a01), пробы U в
-tests/rp6-vkd3d-sparse-test.c, по пять TYPELESS-классам:
+Measured on Adreno 740 (chip_id 0x43050a01), probe U in
+tests/rp6-vkd3d-sparse-test.c, over five TYPELESS classes:
 
-  сток (0004-0006):  list=0x100000 против nonmut=0x102000  -> список снял UBWC
-  с патчем:          list=0x102000                            -> список сохранил
+  stock (0004-0006):  list=0x100000 vs nonmut=0x102000  -> list dropped UBWC
+  with patch:         list=0x102000                      -> list kept it
 
-  roundtrip (CopyBufferToImage -> CopyImageToBuffer, побайтовое сравнение):
-  сток   linear/nonmut/list  0/262144, 0/262144, 0/262144    EXACT
-  патч   linear/nonmut/list  0/262144, 0/262144, 0/262144    EXACT
+  roundtrip (CopyBufferToImage -> CopyImageToBuffer, byte-by-byte compare):
+  stock  linear/nonmut/list  0/262144, 0/262144, 0/262144    EXACT
+  patch  linear/nonmut/list  0/262144, 0/262144, 0/262144    EXACT
 
-Изолированный A/B на стеке 0005-0010 (04.10.2026): присутствие патча меняет
-ровно 5 строк пробы U, всё остальное идентично (results/test-stack.log против
-results/test-0012.log). Лог бэкапа драйвера от 02.10 (results/test-backup-oct2.log)
-байт-в-байт совпадает с прогоном стек+этот патч — бэкап собран с ним.
+Isolated A/B on the 0005-0010 stack (04.10.2026): the presence of the
+patch changes exactly 5 lines of probe U, everything else is identical
+(results/test-stack.log vs results/test-0012.log). The driver backup log
+from 02.10 (results/test-backup-oct2.log) matches byte for byte the run
+of stack+this patch - the backup was built with it.
 
-Регрессий нет: пробы S (0005) и T (0006) по-прежнему PASS.
+No regressions: probes S (0005) and T (0006) are still PASS.
 
-Промотирован из experiments/0008-experiment-sfloat-int-ubwc-compat.patch
-(04.10.2026). Оговорка про fast-clear сохранена, разбор — docs/analysis.md,
-раздел 20.5.
+Promoted from experiments/0008-experiment-sfloat-int-ubwc-compat.patch
+(04.10.2026). The fast-clear caveat is kept; analysis - docs/analysis.md,
+section 20.5.
 
 --- a/src/freedreno/common/freedreno_ubwc.h
 +++ b/src/freedreno/common/freedreno_ubwc.h

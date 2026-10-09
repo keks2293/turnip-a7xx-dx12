@@ -1,45 +1,49 @@
-Список форматов, где одноканальный формат спорит с многоканальным: оставить тайлинг
+A format list where a single-channel format disagrees with a multi-channel one: keep the tiling
 
-Связи: требует patches/0005-turnip-mutable-uniform-swap-tiling.patch — тот
-добавляет tu6_format_list_swaps_are_uniform(), а этот патч расширяет её
-правило. Без 0005 не применяется (контекст в tu_formats.cc) и
-семантически бессмыслен.
+Relations: requires patches/0005-turnip-mutable-uniform-swap-tiling.patch -
+it adds tu6_format_list_swaps_are_uniform(), and this patch extends
+its rule. Without 0005 it does not apply (context in tu_formats.cc)
+and is semantically meaningless.
 
-Что не так. Функция требует, чтобы swap всех форматов списка совпадал, и
-одно-единственный R32_UINT в списке в этом виноват: B8G8R8A8_UNORM несёт WXYZ,
-а R32_* несёт WZYX. Но на тайлинге swap'а для вида вообще не существует.
-fd6_pipe2swap() отдаёт WZYX каждому формату, кроме is_mutable
-(fd6_format_table.c:396), то есть на тайлинге разница между WXYZ и WZYX не имеет
-представления и не может быть причиной демоции в linear. Линейный путь при этом
-взят из того же tu6_format_texture(..., TILE6_LINEAR, false).
+What is wrong. The function requires the swap of every format in the
+list to match, and the single R32_UINT in the list is to blame:
+B8G8R8A8_UNORM carries WXYZ while R32_* carries WZYX. But on tiling,
+no swap for the view exists at all. fd6_pipe2swap() returns WZYX to
+every format except is_mutable (fd6_format_table.c:396), so on tiling
+the difference between WXYZ and WZYX has no representation and cannot
+be the cause of demotion to linear. The linear path, for its part,
+comes from the same tu6_format_texture(..., TILE6_LINEAR, false).
 
-Что меняется. Одноканальный формат исключается из сравнения порядка каналов: у
-него порядка каналов нет, спорить не о чем. Сравнение формы блока (bits, width,
-height) остаётся для всех, потому что раскладка тайла зависит только от размера
-блока (fd6_layout.c:115). Остальные проверки - число каналов, swizzle, размеры
-каналов - сохранены без изменений, и эталон теперь берётся от первого в списке
-формата, у которого порядок каналов вообще есть.
+What changes. The single-channel format is excluded from the
+channel-order comparison: it has no channel order, there is nothing to
+argue about. The block-shape comparison (bits, width, height) stays for
+everyone, because the tile layout depends only on the block size
+(fd6_layout.c:115). The remaining checks - channel count, swizzle,
+channel sizes - are kept unchanged, and the reference is now taken from
+the first format in the list that has a channel order at all.
 
-Зачем. Именно этот список строит vkd3d-proton для typeless-BGRA8 с
-D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS: правило D3D11 про typed UAV load
-(resource.c:393-401) дописывает R32{U,I,F} к каждому 32-битному
-typeless-формату. Из 72 классов tests/vkd3d-fmt-classes.h на стоке в linear
-уходят ровно два - B8G8R8A8_TYPELESS+UAV и B8G8R8X8_TYPELESS+UAV, то есть самый
-частый список vkd3d для 32-битной текстуры. С этим патчем ни один класс vkd3d
-на gen2 в linear не уходит.
+Why. This is exactly the list vkd3d-proton builds for typeless-BGRA8
+with D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS: the D3D11 typed
+UAV-load rule (resource.c:393-401) appends R32{U,I,F} to every 32-bit
+typeless format. Out of the 72 classes of tests/vkd3d-fmt-classes.h,
+exactly two go to linear on stock - B8G8R8A8_TYPELESS+UAV and
+B8G8R8X8_TYPELESS+UAV, i.e. vkd3d's most common list for a 32-bit
+texture. With this patch no vkd3d class on gen2 goes to linear.
 
-Что не задет. Кросс-порядок {BGRA8, RGBA8} - два многоканальных формата с
-противоположным порядком каналов - и NV12 остаются linear: там спор настоящий.
-Проверено перебором (scripts/fmt-list-gate-check.py --exp-0009) и на железе.
+What is untouched. The cross-order {BGRA8, RGBA8} - two multi-channel
+formats with opposite channel order - and NV12 stay linear: there the
+disagreement is real. Verified by enumeration
+(scripts/fmt-list-gate-check.py --exp-0009) and on hardware.
 
-Чем платим, измерено на 740. Сторона BGRA8 - fill и readback форматом образа -
-не тронута, roundtrip EXACT 0/262144. Меняется видимость через второй вид:
-R32_UINT-вид отдаёт слово с обменом байта 0 и байта 2, 261120/262144 слов
-расходятся с линейным путём. По D3D12 это безопасно: типизированный UAV load
-BGRA8 возвращает float4 и читается видом формата самого ресурса, а ресурс,
-объявленный ALLOW_UNORDERED_ACCESS, остаётся типизированным BGRA8, так что
-сырое 32-битное чтение через R32-вид в D3D12 и не выражается. Разбор, логи и
-проба - docs/analysis.md раздел 21.
+What it costs, measured on the 740. The BGRA8 side - fill and readback
+with the image format - is untouched, roundtrip EXACT 0/262144. What
+changes is visibility through a second view: the R32_UINT view returns
+a word with bytes 0 and 2 swapped, 261120/262144 words diverge from
+the linear path. Under D3D12 this is safe: a typed UAV load of BGRA8
+returns float4 and is read through a view of the resource's own
+format, and a resource declared ALLOW_UNORDERED_ACCESS stays typed
+BGRA8, so a raw 32-bit read through an R32 view is inexpressible in
+D3D12 anyway. Analysis, logs and probe - docs/analysis.md, section 21.
 
 diff --git a/src/freedreno/vulkan/tu_formats.cc b/src/freedreno/vulkan/tu_formats.cc
 --- a/src/freedreno/vulkan/tu_formats.cc

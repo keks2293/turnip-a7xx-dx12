@@ -1,26 +1,26 @@
-Эксперимент: снимает ли 0004 отказ на create, из-за которого игра на 12_0
-показывает «GPU не подходит под минимальные требования».
+Experiment: does 0004 remove the refusal on create, because of which the game on 12_0
+shows "GPU does not meet the minimum requirements".
 
-Наблюдение, которое мотивирует эксперимент: с патченым драйвером игра
-создаёт устройство на 12_0 (отказа 0xc000 больше нет), поднимает swapchain
-не успевает и показывает окно с отказом по требованиям, при этом лог чист —
-ни одного err: и ни одного Exception. Отказ 0004 возвращает
-VK_ERROR_FEATURE_NOT_PRESENT из tu_image_init для образа с
-SPARSE_RESIDENCY, который ушёл в linear (список совместимых форматов
-демотирует его), и это ровно тот код, который игра на 12_0 дёргает шире, чем
-на 11_1. Если после снятия отказа окно исчезнет и появится swapchain, причина
-найдена; если нет - отказ 0004 ни при чём, и искать надо в другом месте.
+The observation that motivates the experiment: with the patched driver the game
+creates a device on 12_0 (the 0xc000 refusal is gone), fails to bring the swapchain
+up in time and shows a window refusing the requirements, while the log is clean -
+not a single err: and not a single Exception. The 0004 refusal returns
+VK_ERROR_FEATURE_NOT_PRESENT from tu_image_init for an image with
+SPARSE_RESIDENCY that went to linear (the list of compatible formats
+demotes it), and this is exactly the code that the game on 12_0 calls wider than
+on 11_1. If after removing the refusal the window disappears and a swapchain appears, the cause is
+found; if not - the 0004 refusal is not to blame, and one has to look elsewhere.
 
-Патч трогает ровно одну проверку. Снятие гейта (экспозиция
-sparseResidencyImage2D в tu_device.cc) остаётся - иначе нечего проверять.
-assert из апстрима не возвращаем: в release-сборке он активен и просто
-убил бы процесс, что не отличить от отказа.
+The patch touches exactly one check. Removing the gate (exposing
+sparseResidencyImage2D in tu_device.cc) stays - otherwise there is nothing to test.
+We do not restore the upstream assert: in a release build it is active and would simply
+kill the process, which cannot be told from a refusal.
 
-Ожидаемо, если гипотеза верна: игра создаёт образ, окно с требованиями
-исчезает, в логе появляется dxgi_vk_swap_chain_init.
-Ожидаемо, если гипотеза неверна: окно остаётся, поведение прогона не меняется.
+Expected if the hypothesis is right: the game creates the image, the requirements window
+disappears, dxgi_vk_swap_chain_init appears in the log.
+Expected if the hypothesis is wrong: the window stays, the run behavior does not change.
 
-Прогон (сборка ~5 минут, игра 200 с):
+Run (build ~5 minutes, game 200 s):
 
     cd /var/home/armada/opencode/build/mesa-rp6
     git apply /var/home/armada/opencode/turnip-a7xx-dx12/experiments/0003-experiment-no-sparse-create-refusal.patch
@@ -30,10 +30,10 @@ assert из апстрима не возвращаем: в release-сборке 
                && cp build/src/freedreno/vulkan/libvulkan_freedreno.so /out/out/'
     scripts/run-game.sh patched 200
 
-Откат: git apply -R /var/home/armada/opencode/turnip-a7xx-dx12/experiments/0003-experiment-no-sparse-create-refusal.patch
-(git checkout этого файла не использовать: в нём лежат незакоммиченные 0005/0006.)
+Rollback: git apply -R /var/home/armada/opencode/turnip-a7xx-dx12/experiments/0003-experiment-no-sparse-create-refusal.patch
+(do not use git checkout of this file: it holds uncommitted 0005/0006.)
 
-Лог: results/raw/game-patched-norefusal.log (вне git), отфильтрованный -
+Log: results/raw/game-patched-norefusal.log (outside git), filtered -
 results/game-patched-norefusal.log.
 
 diff --git a/src/freedreno/vulkan/tu_image.cc b/src/freedreno/vulkan/tu_image.cc
