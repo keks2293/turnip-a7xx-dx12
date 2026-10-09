@@ -23,14 +23,14 @@ Expected if the hypothesis is wrong: the window stays, the run behavior does not
 Run (build ~5 minutes, game 200 s):
 
     cd /var/home/armada/opencode/build/mesa-rp6
-    git apply /var/home/armada/opencode/turnip-a7xx-dx12/experiments/0003-experiment-no-sparse-create-refusal.patch
+    git apply /var/home/armada/opencode/turnip-a7xx-dx12/experiments/exp-3-no-sparse-create-refusal.patch
     podman run --rm -v $PWD:/src:Z -v /var/home/armada/opencode/build:/out:Z \
       localhost/mesa-build-fedora44-wsi-glslang \
       bash -c 'cd /src && ninja -C build -j4 src/freedreno/vulkan/libvulkan_freedreno.so \
                && cp build/src/freedreno/vulkan/libvulkan_freedreno.so /out/out/'
     scripts/run-game.sh patched 200
 
-Rollback: git apply -R /var/home/armada/opencode/turnip-a7xx-dx12/experiments/0003-experiment-no-sparse-create-refusal.patch
+Rollback: git apply -R /var/home/armada/opencode/turnip-a7xx-dx12/experiments/exp-3-no-sparse-create-refusal.patch
 (do not use git checkout of this file: it holds uncommitted 0005/0006.)
 
 Log: results/raw/game-patched-norefusal.log (outside git), filtered -
@@ -46,7 +46,7 @@ index 8a109e16b58..fdc5c2bd52e 100644
      * SPARSE_RESIDENCY silently reads and writes the wrong places instead of
 -    * failing, and the format query cannot see the format list which demoted
 -    * us to linear.  Refuse the create.
-+    * failing.  EXPERIMENT 0003: the refusal is removed on purpose, to see
++    * failing.  EXPERIMENT 3: the refusal is removed on purpose, to see
 +    * whether it is what makes the game refuse to start.  See experiments/.
      */
 -   if (image->vk.create_flags & VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT) {

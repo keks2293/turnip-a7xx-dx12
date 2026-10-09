@@ -13,11 +13,11 @@ Transfers to Python exactly those predicates that decide the fate of an image in
   NV12 branch                                -> patch 0009 removes force_linear_tile
   FD6_UBWC_B8G8R8A8_INT                      -> patch 0006
 
-Experiments (numbering of experiments/ is its own, flags --exp-*):
-  --exp-0009  a single-channel format (R32_UINT and the like) does not push the
+Experiments (files exp-N in experiments/, flags --exp-N):
+  --exp-9  a single-channel format (R32_UINT and the like) does not push the
              list into linear: it has no channel order to argue about.
              Changes tu6_format_list_swaps_are_uniform().
-  --exp-0010  in the !mutable_ubwc_fc branch is_mutable = true is set
+  --exp-10  in the !mutable_ubwc_fc branch is_mutable = true is set
              (MUTABLEEN without UBWC). Changes only tu_image_init().
 
 The early exit is the main thing: if the list is "UBWC-compatible", `has_swaps`
@@ -133,7 +133,7 @@ def load_format_table(path):
 def fd6_ubwc_compat_mode(fmt, props, patch_0006=False, patch_0010=False, patch_0011=False):
     """Port of fd6_ubwc_compat_mode() from freedreno_ubwc.h (stock).
 
-    patch_0010 — patch 0012 (used to be experiment 0008): include the _SFLOAT
+    patch_0010 — patch 0012 (used to be exp-8): include the _SFLOAT
     members in the integer compat classes.  Stock does not include them, and for R32_FLOAT it says directly
     «a630 blob allows these, but not a660» (a660 == our gen2 family),
     so this is a hypothesis test, not a port of code.
@@ -301,7 +301,7 @@ def report_blockers(swap, classes, props, patch_0006=False, patch_0010=False, pa
 
 
 def report_0011(swap, classes, props):
-    """What experiment 0011 changes: rows for R16_* and A2B10G10R10_*.
+    """What exp-11 changes: rows for R16_* and A2B10G10R10_*.
 
     The basis is a measurement, not reasoning.  The CEIL probe (results/test-CEIL-
     stock.log) showed that a lone R16_UNORM and A2B10G10R10_UNORM_PACK32 without
@@ -323,7 +323,7 @@ def report_0011(swap, classes, props):
                                        patch_0011=True)
         closed.append((name, fmts, "UBWC removed by the gate" if not early_before else "UBWC",
                        "tiled+UBWC" if early_after else "??"))
-    print(f"\n### Experiment 0011: closes {len(closed)} classes\n")
+    print(f"\n### Experiment 11: closes {len(closed)} classes\n")
     for name, fmts, before, after in closed:
         print(f"  {name:24} n={len(fmts)}  {before}  ->  {after}")
     return closed
@@ -341,7 +341,7 @@ def report_stack(swap, classes, props, patch_0011=False):
     occur in them as substrings.  The compression check runs first, and planar
     video formats are filtered out by it.
     """
-    kw = dict(patch_0005=True, patch_0006=True, patch_0010=True, exp_0009=True)
+    kw = dict(patch_0005=True, patch_0006=True, patch_0010=True, exp_9=True)
     n_ubwc = n_lin = 0
     groups = {}
     for name, fmts in classes:
@@ -433,17 +433,17 @@ def has_swaps(formats, swap):
     return any(table_lookup(swap, f) not in (None, "WZYX") for f in formats)
 
 
-def swaps_are_uniform(formats, swap, exp_0009=False):
+def swaps_are_uniform(formats, swap, exp_9=False):
     """tu6_format_list_swaps_are_uniform() from patch 0005.
 
-    exp_0009 — experiment 0009: a single-channel format has no channel order,
+    exp_9 — exp-9: a single-channel format has no channel order,
     so its own swap cannot argue with a foreign one; only a match of the block
     shape (bits/width/height) is required of it, because the tile layout is a
     function of the block size (fd6_layout.c: layout->cpp).
     """
     if not formats or len(formats) < 2:
         return False
-    if exp_0009:
+    if exp_9:
         # block shape is a block by size, not together with the channel count:
         # the tile layout depends only on util_format_get_blocksize()
         block = lambda f: geom(f)[0]
@@ -490,7 +490,7 @@ class Layout:
 
 def tu_image_init(base, formats, swap, props, patch_0005=False, patch_0006=False,
                   patch_0009=True, patch_0010=False, patch_0011=False,
-                  exp_0009=False, exp_0010=False):
+                  exp_9=False, exp_10=False):
     """Returns (Layout, whether the early exit fired)."""
     if ubwc_compatible(formats, props, patch_0006, patch_0010, patch_0011):
         return Layout(True, True, "early exit: list is UBWC-compatible"), True
@@ -507,16 +507,16 @@ def tu_image_init(base, formats, swap, props, patch_0005=False, patch_0006=False
     if reinterprets_r8g8_r16(base, formats):
         tiled, branch = False, "r8g8↔r16"
     elif has_swaps(formats, swap) and (not patch_0005 or
-                                       not swaps_are_uniform(formats, swap, exp_0009)):
+                                       not swaps_are_uniform(formats, swap, exp_9)):
         tiled, branch = False, "has_swaps" + ("" if patch_0005 else " (stock)")
     # exp. 0010 sets is_mutable = true in this very branch, where UBWC is already
     # removed. It does not touch tiling, and on gen2 with diverging swaps it only
     # breaks the content (docs/analysis.md §21.4), so in the model it is marked
     # with a flag, not by substituting the layout.
-    return Layout(False, tiled, branch, mutable=exp_0010), False
+    return Layout(False, tiled, branch, mutable=exp_10), False
 
 
-def forces_linear(base, formats, swap, props, patch_0005=False, patch_0006=False, exp_0009=False):
+def forces_linear(base, formats, swap, props, patch_0005=False, patch_0006=False, exp_9=False):
     """tu6_mutable_format_list_forces_linear(): sparse request from patch 0004."""
     if ubwc_compatible(formats, props, patch_0006):
         return False, "early exit"
@@ -529,7 +529,7 @@ def forces_linear(base, formats, swap, props, patch_0005=False, patch_0006=False
     if reinterprets_r8g8_r16(base, formats):
         return True, "r8g8↔r16"
     if has_swaps(formats, swap) and (not patch_0005 or
-                                    not swaps_are_uniform(formats, swap, exp_0009)):
+                                    not swaps_are_uniform(formats, swap, exp_9)):
         return True, "has_swaps" + ("" if patch_0005 else " (stock)")
     return False, "no trigger"
 
@@ -585,7 +585,7 @@ def zink_srgb_pairs(swap):
     return pairs
 
 
-def report_vkd3d(swap, classes, props, exp_0009=False, exp_0010=False):
+def report_vkd3d(swap, classes, props, exp_9=False, exp_10=False):
     print(f"### vkd3d: {len(classes)} classes from tests/vkd3d-fmt-classes.h\n")
     groups = {}
     for name, fmts in classes:
@@ -593,10 +593,10 @@ def report_vkd3d(swap, classes, props, exp_0009=False, exp_0010=False):
         stock, early = tu_image_init(base, fmts, swap, props)
         p5, _ = tu_image_init(base, fmts, swap, props, patch_0005=True)
         p56, _ = tu_image_init(base, fmts, swap, props, patch_0005=True, patch_0006=True)
-        p9 = tu_image_init(base, fmts, swap, props, patch_0005=True, exp_0009=exp_0009)[0] \
-            if exp_0009 else None
+        p9 = tu_image_init(base, fmts, swap, props, patch_0005=True, exp_9=exp_9)[0] \
+            if exp_9 else None
         p10 = tu_image_init(base, fmts, swap, props, patch_0005=True,
-                            exp_0009=exp_0009, exp_0010=exp_0010)[0] if exp_0010 else None
+                            exp_9=exp_9, exp_10=exp_10)[0] if exp_10 else None
         key = (early, str(stock), str(p5), str(p56), str(p9) if p9 else "",
                str(p10) if p10 else "", stock.branch)
         groups.setdefault(key, []).append(name)
@@ -609,20 +609,20 @@ def report_vkd3d(swap, classes, props, exp_0009=False, exp_0010=False):
             print(f"        {', '.join(names)}")
     linear = [n for n, f in classes if not tu_image_init(f[0], f, swap, props)[0].tiled]
     print(f"\nin linear on stock: {len(linear)} of {len(classes)}")
-    if exp_0009:
-        # what exactly experiment 0009 flips
+    if exp_9:
+        # what exactly exp-9 flips
         flipped = []
         for name, fmts in classes:
             base = fmts[0]
             a = tu_image_init(base, fmts, swap, props, patch_0005=True)[0]
-            b = tu_image_init(base, fmts, swap, props, patch_0005=True, exp_0009=True)[0]
+            b = tu_image_init(base, fmts, swap, props, patch_0005=True, exp_9=True)[0]
             if a.tiled != b.tiled:
                 flipped.append((name, str(a), str(b)))
         print(f"exp.0009 flips {len(flipped)} classes:")
         for name, a, b in flipped:
             print(f"        {name}: {a} -> {b}")
         left = [n for n, f in classes
-                if not tu_image_init(f[0], f, swap, props, patch_0005=True, exp_0009=True)[0].tiled]
+                if not tu_image_init(f[0], f, swap, props, patch_0005=True, exp_9=True)[0].tiled]
         print(f"in linear with exp.0009: {len(left)} of {len(classes)} -> {', '.join(left)}")
     return linear
 
@@ -659,10 +659,10 @@ def report_zink(swap, props):
         p5, _ = tu_image_init(base, fmts, swap, props, patch_0005=True)
         p6, _ = tu_image_init(base, fmts, swap, props, patch_0006=True)
         p56, _ = tu_image_init(base, fmts, swap, props, patch_0005=True, patch_0006=True)
-        p59, _ = tu_image_init(base, fmts, swap, props, patch_0005=True, exp_0009=True)
+        p59, _ = tu_image_init(base, fmts, swap, props, patch_0005=True, exp_9=True)
         fl_stock, _ = forces_linear(base, fmts, swap, props)
         fl_p5, _ = forces_linear(base, fmts, swap, props, patch_0005=True)
-        fl_p59, _ = forces_linear(base, fmts, swap, props, patch_0005=True, exp_0009=True)
+        fl_p59, _ = forces_linear(base, fmts, swap, props, patch_0005=True, exp_9=True)
         print(f"{name}\n    create:   stock {stock:16} +0005 {p5:16} +0006 {p6:16} +0005+0006 {p56:16}"
               f"\n    exp.0009: {p59:16}"
               f"\n    sparse:   stock forces_linear={fl_stock!s:5} +0005 {fl_p5!s:5} +exp.0009 {fl_p59!s:5}")
@@ -698,7 +698,7 @@ def report_all_pairs(swap, props):
     fixed5 = [(a, b) for lst in buckets.values() for a, b, s, p5, _ in lst if s == False and p5]
     fixed6 = [(a, b) for lst in buckets.values() for a, b, s, _, p6 in lst if s == False and p6]
     only5 = [x for x in fixed5 if x not in set(fixed6)]
-    print(f"\n0005 returns tiling: {len(fixed5)} pairs, of which only 0005 — {len(only5)}")
+    print(f"\n0005 returns tiling: {len(fixed5)} pairs, of which only exp-5 — {len(only5)}")
     print(f"0006 returns tiling: {len(fixed6)} pairs (B8G8R8A8 lists with UNORM/SRGB/SNORM/UINT/SINT)")
 
 
@@ -707,14 +707,14 @@ def main():
     ap.add_argument("--table", default=DEFAULT_TABLE, help="path to fd6_format_table.c")
     ap.add_argument("--classes", default=os.path.join(REPO, "tests", "vkd3d-fmt-classes.h"))
     ap.add_argument("--all-pairs", action="store_true", help="enumerate all format pairs")
-    ap.add_argument("--exp-0009", action="store_true",
-                    help="experiment 0009: a single-channel format does not push the list into linear")
-    ap.add_argument("--exp-0010", action="store_true",
-                    help="experiment 0010: MUTABLEEN without UBWC in the !mutable_ubwc_fc branch")
+    ap.add_argument("--exp-9", action="store_true",
+                    help="exp-9: a single-channel format does not push the list into linear")
+    ap.add_argument("--exp-10", action="store_true",
+                    help="exp-10: MUTABLEEN without UBWC in the !mutable_ubwc_fc branch")
     ap.add_argument("--blockers", action="store_true",
                     help="analysis of classes where the gate removes UBWC but tiling stays")
     ap.add_argument("--exp-0011", action="store_true",
-                    help="experiment 0011: rows for the single-channel 16-bit "
+                    help="exp-11: rows for the single-channel 16-bit "
                          "and packed-10-bit in fd6_ubwc_compat_mode()")
     ap.add_argument("--stack", action="store_true",
                     help="layout of the working stack and analysis of the remaining "
@@ -727,14 +727,14 @@ def main():
 
     swap, _ = load_format_table(args.table)
     print(f"GPU properties: FD740 = [a7xx_base, a7xx_gen2] -> {GEN2_PROPS}")
-    if args.exp_0009 or args.exp_0010:
-        print(f"experiments: 0009={'on' if args.exp_0009 else 'off'} "
-              f"0010={'on' if args.exp_0010 else 'off'}")
+    if args.exp_9 or args.exp_10:
+        print(f"experiments: exp-9={'on' if args.exp_9 else 'off'} "
+              f"exp-10={'on' if args.exp_10 else 'off'}")
     print()
 
     if os.path.exists(args.classes):
         classes = load_vkd3d_classes(args.classes)
-        report_vkd3d(swap, classes, GEN2_PROPS, args.exp_0009, args.exp_0010)
+        report_vkd3d(swap, classes, GEN2_PROPS, args.exp_9, args.exp_10)
         if args.exp_0011:
             report_0011(swap, classes, GEN2_PROPS)
         if args.blockers:
@@ -743,7 +743,7 @@ def main():
             print("\n" + "-" * 78 + "\nwith patch 0012 (_SFLOAT -> integer classes):")
             report_blockers(swap, classes, GEN2_PROPS, patch_0010=True)
             if args.exp_0011:
-                print("\n" + "-" * 78 + "\nand with experiment 0011 (single-channel 16 bit "
+                print("\n" + "-" * 78 + "\nand with exp-11 (single-channel 16 bit "
                       "+ packed-10 bit):")
                 report_blockers(swap, classes, GEN2_PROPS, patch_0010=True, patch_0011=True)
     if args.stack:

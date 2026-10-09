@@ -27,7 +27,7 @@ as zeros.
 |---|---|
 | `docs/analysis.md` | the analysis: symptom, cause, measurements, applicability boundaries, reproduction; `docs/rp6-vkd3d-analysis.md` - the original short analysis (21.09.2026) it grew out of |
 | `patches/` | 0001-0012 - the Mesa patches that ship; `PATCHES.md` - the origin of 0001-0003 |
-| `experiments/` | 0001-0011 - **not** for commit: reproducible checks of the analysis' conclusions |
+| `experiments/` | `exp-1`-`exp-11` - **not** for commit: reproducible checks of the analysis' conclusions |
 | `tests/` | `rp6-vkd3d-sparse-test.c` + shaders; every result was obtained with it |
 | `scripts/` | build and runs, including the experiment script and game launch |
 | `container/` | toolchain Containerfile (there is no compiler on the device) |
@@ -162,14 +162,14 @@ Patches **0007** (`TU_FORCE_PROPS`, diagnostics only) and **0008**
 not work without environment variables, 0008 is switched by the device
 table.
 
-The numbering of `experiments/` and `patches/` **does not overlap by
-meaning**: the patch `0006-turnip-b8g8r8a8-int-compat-type.patch` adds
-`FD6_UBWC_B8G8R8A8_INT`, while experiment 0006 is the cross-order
-tiled+UBWC probe `experiments/0006-experiment-cross-order-list-tiled-ubwc.patch`
+The numbering of `experiments/` and `patches/` **cannot collide**: the
+probes are `exp-N`, the patches are `000N`. The cross-order tiled+UBWC
+probe is `experiments/exp-6-cross-order-list-tiled-ubwc.patch`
 (analysis - `docs/analysis.md`, §16, §16.1 and §16.2: neither vkd3d nor
-Zink has any consumers of such lists). Which experiment went into which
-patch and which of those is already in mesa - the "Experiment ->
-patch -> mesa" table in the section below.
+Zink has any consumers of such lists), while the patch
+`0006-turnip-b8g8r8a8-int-compat-type.patch` adds `FD6_UBWC_B8G8R8A8_INT`.
+Which experiment went into which patch and which of those is already in
+mesa - the "Experiment -> patch -> mesa" table in the section below.
 
 ### About the build image
 
@@ -223,17 +223,17 @@ never go to mesa themselves - only their results do, as `patches/000N`.
 
 | Experiment | What it showed | -> Patch | mesa commit |
 |---|---|---|---|
-| `0001-ubwc-all-formats-compatible-a7xx-gen2` | negative result: gen2 cannot reinterpret UBWC on a format change | — | — |
-| `0002-force-is-mutable` | isolation: MUTABLEEN itself breaks reads | — | — |
-| `0003-no-sparse-create-refusal` | game run: 0004's create refusal and the "GPU does not meet the minimum requirements" message (§9) | — (checks `0004`) | — |
-| `0004-force-wzyx-when-mutable` | the MUTABLEEN corruption lies entirely in swap | — | — |
-| `0005-ubwc-on-without-mutableen` | the capability is not there, not "the bit is harmful" | — | — |
-| `0006-cross-order-list-tiled-ubwc` | mechanically survives, but neither vkd3d nor Zink builds such lists (§16) -> rollback | — | — |
-| `0007-nv12-keep-tiling` | N2 (NV12 + MUTABLE + SPARSE): `FEATURE_NOT_PRESENT` -> `SUCCESS` (§18) | `0009` | not moved yet |
-| `0008-sfloat-int-ubwc-compat` | 5 TYPELESS classes gain UBWC, 31 -> 36 classes (§20.5) | `0012` | not moved yet |
-| `0009-single-channel-swap-vacuous` | exactly 2 of 72 classes get tiling (§21.3) | `0010` | not moved yet |
-| `0010-is-mutable-without-ubwc` | is_mutable alone does not break anything (§21.4) | — | — |
-| `0011-ubwc-compat-r16-and-10bit` | 8 of 72 classes with UBWC, the gate is what lifts it (§21.6) | `0011` | not moved yet |
+| `exp-1-ubwc-all-formats-compatible-a7xx-gen2` | negative result: gen2 cannot reinterpret UBWC on a format change | — | — |
+| `exp-2-force-is-mutable` | isolation: MUTABLEEN itself breaks reads | — | — |
+| `exp-3-no-sparse-create-refusal` | game run: 0004's create refusal and the "GPU does not meet the minimum requirements" message (§9) | — (checks `0004`) | — |
+| `exp-4-force-wzyx-when-mutable` | the MUTABLEEN corruption lies entirely in swap | — | — |
+| `exp-5-ubwc-on-without-mutableen` | the capability is not there, not "the bit is harmful" | — | — |
+| `exp-6-cross-order-list-tiled-ubwc` | mechanically survives, but neither vkd3d nor Zink builds such lists (§16) -> rollback | — | — |
+| `exp-7-nv12-keep-tiling` | N2 (NV12 + MUTABLE + SPARSE): `FEATURE_NOT_PRESENT` -> `SUCCESS` (§18) | `0009` | not moved yet |
+| `exp-8-sfloat-int-ubwc-compat` | 5 TYPELESS classes gain UBWC, 31 -> 36 classes (§20.5) | `0012` | not moved yet |
+| `exp-9-single-channel-swap-vacuous` | exactly 2 of 72 classes get tiling (§21.3) | `0010` | not moved yet |
+| `exp-10-is-mutable-without-ubwc` | is_mutable alone does not break anything (§21.4) | — | — |
+| `exp-11-ubwc-compat-r16-and-10bit` | 8 of 72 classes with UBWC, the gate is what lifts it (§21.6) | `0011` | not moved yet |
 
 ## What was verified by measurement
 

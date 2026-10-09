@@ -5,7 +5,7 @@ diff --git a/src/freedreno/vulkan/tu_image.cc b/src/freedreno/vulkan/tu_image.cc
                 ubwc_enabled = false;
              }
  
-+            /* EXPERIMENT - NOT FOR COMMIT.  Requires experiment 0009
++            /* EXPERIMENT - NOT FOR COMMIT.  Requires exp-9
 +             * (tu6_format_list_swaps_are_uniform(): single-channel formats
 +             * do not push a list to linear), otherwise every list reached
 +             * here still has force_linear_tile set and fd6_view.cc:252 gates

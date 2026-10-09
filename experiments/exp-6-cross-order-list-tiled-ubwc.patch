@@ -20,14 +20,14 @@ cross view or corruption of raw = UBWC cross-order garbage → rollback.
 
 Run:
     cd /var/home/armada/opencode/build/mesa-rp6
-    git apply experiments/0006-... (already applied in the working tree)
+    git apply experiments/exp-6-... (already applied in the working tree)
     podman run --rm -v $PWD:/src:Z -v /var/home/armada/opencode/build:/out:Z \
       localhost/mesa-build-fedora44-wsi-glslang \
       bash -c 'cd /src && ninja -C build -j4 src/freedreno/vulkan/libvulkan_freedreno.so \
                && cp build/src/freedreno/vulkan/libvulkan_freedreno.so /out/out/'
     scripts/run-test.sh .../freedreno_icd.json results/test-s3-ubwc.log
 
-Rollback: git apply -R experiments/0006-... (do not use git checkout:
+Rollback: git apply -R experiments/exp-6-... (do not use git checkout:
 the files hold uncommitted 0005-0008), then rebuild and run the control
 run - S3 must return to the linear control.
 
