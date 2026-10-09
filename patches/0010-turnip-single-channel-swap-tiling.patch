@@ -33,7 +33,7 @@ texture. With this patch no vkd3d class on gen2 goes to linear.
 What is untouched. The cross-order {BGRA8, RGBA8} - two multi-channel
 formats with opposite channel order - and NV12 stay linear: there the
 disagreement is real. Verified by enumeration
-(scripts/fmt-list-gate-check.py --exp-0009) and on hardware.
+(scripts/fmt-list-gate-check.py --exp-9) and on hardware.
 
 What it costs, measured on the 740. The BGRA8 side - fill and readback
 with the image format - is untouched, roundtrip EXACT 0/262144. What

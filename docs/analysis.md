@@ -307,7 +307,7 @@ patches are implemented, built and verified on the device — the stock driver
 
 The key measurement is **S**: on stock the image is created but reads back all
 zeros (the linear+sparse hole; create passes only because the feature and the
-query lie). With 0004 create is honestly rejected, with 0005 — it is created
+query lie). With 0004 create is honestly rejected, with exp-5 — it is created
 and both views read exactly.
 
 The key measurement for 0006 is **T**: the appearance of `0x2000` of UBWC
@@ -786,7 +786,7 @@ The guess was this: by design 0004 rejects create for the combination sparse +
 MUTABLE without a compatible format list, while vkd3d sets
 `MUTABLE_FORMAT_BIT` liberally and not always with a list; at 11_1 the game
 doesn't touch this path, at 12_0 it does, and the 0004 rejection hits the
-target. **The version was checked and disproved:** experiment 0003 removed
+target. **The version was checked and disproved:** exp-3 removed
 exactly that rejection while keeping the gate removal, and the game's behavior
 didn't change — the swapchain still didn't come up (no
 `dxgi_vk_swap_chain_init` line), the "your GPU was not supported" window still
@@ -1375,7 +1375,7 @@ A/B on a single test binary, 0002 is applied in both cases:
 | `S-tr` | **16384/16384** | **0/16384** |
 
 Logs: `results/test-expD-control.log`, `results/test-expD.log`, patch
-`experiments/0004-experiment-force-wzyx-when-mutable.patch`.
+`experiments/exp-4-force-wzyx-when-mutable.patch`.
 
 **All the corruption from `MUTABLEEN` turned out to be in `swap`, and the old
 hack removes it.** Incidentally it turned out that 0004 alone (without 0002)
@@ -1390,7 +1390,7 @@ It doesn't, because `H` doesn't change with 0004 anyway: for {RGBA8, R32_UINT}
 the swap of both formats is `WZYX`, the hack touches nothing there. A separate
 question is needed: **is the bit harmful, or is the capability missing?**
 
-Experiment 0005 keeps UBWC enabled for an incompatible list but doesn't raise
+exp-5 keeps UBWC enabled for an incompatible list but doesn't raise
 `is_mutable` — i.e. `MUTABLEEN=0` while UBWC stays:
 
 | | base (no UBWC) | 0001 (UBWC + `MUTABLEEN=1`) | 0005 (UBWC + `MUTABLEEN=0`) |
@@ -1399,7 +1399,7 @@ Experiment 0005 keeps UBWC enabled for an incompatible list but doesn't raise
 | `H d1'` | not engaged | garbage `0x079d685e…` | **the same garbage, byte-for-byte** |
 
 Log: `results/test-expE.log`, patch
-`experiments/0005-experiment-ubwc-on-without-mutableen.patch`.
+`experiments/exp-5-ubwc-on-without-mutableen.patch`.
 
 **The answer: the capability is missing, not "the bit is harmful".** a740 can't
 read a UBWC-compressed image through a view of another format at all — with the
@@ -1429,7 +1429,7 @@ format of UBWC metadata, and for attachments there is no SWIZ at all
 
 A caveat about the tables: the line `H: memreq ... -> MUTABLEEN in play` is the
 test's own inference from the memreq value, not a fact about the bit. In
-experiment 0005 `MUTABLEEN=0` yet the line is the same; the fact was checked by
+exp-5 `MUTABLEEN=0` yet the line is the same; the fact was checked by
 the `tu_image.cc` edit not raising `is_mutable`.
 
 ## 15. Measuring the props: vkmark and RE4
@@ -1658,16 +1658,16 @@ screenshots from 15.3.
 
 > Here and below "cross-order experiment" is **not patch 0006** (that one adds
 > `FD6_UBWC_B8G8R8A8_INT`, see §5 and `patches/`), but the probe
-> `experiments/0006-experiment-cross-order-list-tiled-ubwc.patch`. The
-> experiment numbering is its own and independent of `patches/`: which
-> experiment went into which patch - the lineage table in the main README.
+> `experiments/exp-6-cross-order-list-tiled-ubwc.patch`. Experiments are
+> numbered `exp-N`, patches `000N`: which experiment went into which
+> patch - the lineage table in the main README.
 
 One reinterpretation scenario remained unused: a format list with the same
 block geometry but a different channel order —
 `{B8G8R8A8_UNORM, R8G8B8A8_UNORM}`. The control (stock and patches
 0004–0008): `swaps_are_uniform()` rejects such a list → `tu_image_init()`
 turns off UBWC and forcibly puts the image in linear. The cross-order
-experiment (`experiments/0006-experiment-cross-order-list-tiled-ubwc.patch`)
+experiment (`experiments/exp-6-cross-order-list-tiled-ubwc.patch`)
 introduces the predicate `tu6_format_list_same_shape()` (all formats of the
 list are the same texel block: channels, bits, shape) and in the mutable branch
 leaves such a list tiled+UBWC; the sparse query
@@ -1712,7 +1712,7 @@ What follows from this:
   `FORMAT_NOT_SUPPORTED` — create and query diverged. `F` (NULL list) was not
   touched, the rest of the test output didn't change (the same 6 `FAIL`s).
 
-Summary: rollback via `git apply -R experiments/0006-experiment-cross-order-…`,
+Summary: rollback via `git apply -R experiments/exp-6-cross-order-…`,
 rebuild the driver, a control run matched the control byte for byte
 (`postrev` == `control`), the mesa tree files were compared with the backup —
 identical. Conclusion: "cross-order tiled+UBWC" is mechanically achievable in
@@ -1837,7 +1837,7 @@ Later these two classes were added to the model (`B8G8R8A8_TYPELESS+UAV`,
 that the "linear is legitimate" rule is excessive here: only single-channel
 formats diverge, which have no channel order at all, so changing visibility
 through
-`R32_UINT` view is nothing to change. `experiments/0009-experiment-single-channel-swap-vacuous.patch`
+`R32_UINT` view is nothing to change. `experiments/exp-9-single-channel-swap-vacuous.patch`
 removes this rule, and tiling returns on the 740. Neither 0005 nor 0006 closes
 this case, see §21.3.
 
@@ -2190,7 +2190,7 @@ wrong measurement setup, not a property of the hardware.
 ### 20.4 What was ultimately measured
 
 After warm-up, on the stock driver and with the experiment
-`experiments/0008-experiment-sfloat-int-ubwc-compat.patch`:
+`experiments/exp-8-sfloat-int-ubwc-compat.patch`:
 
 ```
                               stock (0004-0006)          with patch
@@ -2215,9 +2215,9 @@ printed as "NO (removed)" — that was a wording defect in the probe itself
 (comparison `>` instead of `>=`). It didn't affect the measurement, nor the
 numbers in the table above.
 
-### 20.5 Experiment 0008: `_FLOAT` into the integer compat classes
+### 20.5 exp-8: `_FLOAT` into the integer compat classes
 
-`experiments/0008-experiment-sfloat-int-ubwc-compat.patch` adds `_FLOAT`
+`experiments/exp-8-sfloat-int-ubwc-compat.patch` adds `_FLOAT`
 members to `fd6_ubwc_compat_mode()` (`src/freedreno/common/freedreno_ubwc.h`):
 `R16G16_FLOAT`, `R32_FLOAT`, `R32G32_FLOAT`, `R16G16B16A16_FLOAT`,
 `R32G32B32A32_FLOAT` — into the same classes as their integer analogs.
@@ -2244,7 +2244,7 @@ does a fast-clear through a view in the float interpretation. To close this, a
 probe is needed of the kind `vkCmdFillImage` with a color in float
 interpretation → read raw bytes → compare with the same bit pattern
 recomputed as integers. Until it exists, the caveat remains a risk; on
-04.10.2026 experiment 0008 was nevertheless moved to
+04.10.2026 exp-8 was nevertheless moved to
 `patches/0012-turnip-ubwc-compat-sfloat-int.patch` — at the price of a caveat
 recorded in the patch header (as with 0011).
 
@@ -2316,15 +2316,15 @@ and `[44,34,24,11] -> [24,34,44,11]`. So on tiling the linear→tile transition
 lays out the four B8G8R8A8 components in tile order, and the `R32_UINT` view
 hands out this same raw word with the swap.
 
-### 21.3 Experiment 0009: tiling obtained, BGRA8 untouched, the R32 reinterpretation changes
+### 21.3 exp-9: tiling obtained, BGRA8 untouched, the R32 reinterpretation changes
 
-`experiments/0009-experiment-single-channel-swap-vacuous.patch` removes the
+`experiments/exp-9-single-channel-swap-vacuous.patch` removes the
 over-cautiousness in `tu6_format_list_swaps_are_uniform()`: a single-channel
 format has no channel order to argue about with a foreign format; only block
 shape must match, because the tile layout is a function of
 `util_format_get_blocksize()` (`fd6_layout.c:115`) and nothing more.
 
-The model over 72 classes (`scripts/fmt-list-gate-check.py --exp-0009`)
+The model over 72 classes (`scripts/fmt-list-gate-check.py --exp-9`)
 matched the measurement: **exactly 2 classes** flip, and both are
 typeless-BGRA8/BGRAX8 under UAV. The cross-order `{B8G8R8A8, R8G8B8A8}`, the
 BGR family `{B5G6R5, B5G5R5A1}`, `ZINK_BIND_MUTABLE` without a list and NV12
@@ -2342,9 +2342,9 @@ What this means in substance:
   byte 0 and byte 2 swapped. For a D3D11 typed UAV load this is exactly the
   case for which vkd3d adds `R32` to the list.
 
-### 21.4 Experiment 0010: MUTABLEEN without UBWC — worse than doing nothing
+### 21.4 exp-10: MUTABLEEN without UBWC — worse than doing nothing
 
-`experiments/0010-experiment-is-mutable-without-ubwc.patch` sets
+`experiments/exp-10-is-mutable-without-ubwc.patch` sets
 `is_mutable = true` inside the `else if (!mutable_ubwc_fc)` branch
 (`tu_image.cc:558`), where UBWC is already off — i.e. exactly that combination
 `tiled + UBWC off + MUTABLEEN` that remained unmeasured in §14.
@@ -2374,7 +2374,7 @@ diverging swaps. `is_mutable = true` is set in exactly one branch
 consequence, not a cause.
 
 In the gate model this is reflected by a flag rather than by substituting the
-layout: `tu_image_init(..., exp_0010=True)` gives `tiled, no-UBWC, MUTABLEEN` —
+layout: `tu_image_init(..., exp_10=True)` gives `tiled, no-UBWC, MUTABLEEN` —
 the tiling doesn't change, only the contents do. That's exactly what the
 measurement shows, and precisely why the flag is useless as an optimization.
 
@@ -2383,7 +2383,7 @@ measurement shows, and precisely why the flag is useless as an optimization.
 * **1024 words out of 262144** in the tiled run matched the pattern even though
   the other 261120 diverged. The mismatches run from (0,0) to (511,511), i.e.
   this tail lies in the middle and doesn't follow the geometry of the
-  64-texel chunks. Experiment 0010 gives **exactly the same number**, so this is
+  64-texel chunks. exp-10 gives **exactly the same number**, so this is
   not an artifact of a single run; the cause is not established. The share is
   0.39%, it doesn't affect the verdict.
 * **A view in the `B8G8R8A8_UNORM` format through `usampler2D` is unreadable** —
@@ -2400,7 +2400,7 @@ measurement shows, and precisely why the flag is useless as an optimization.
   on the machine.
 * **Ship status of 0009.** The tiling gain is measured, the BGRA8 side is
   untouched, but the change in visibility through the `R32` view is real, not an
-  artifact. Formally 0009 belongs to `experiments/` until it is decided whether
+  artifact. Formally exp-9 belongs to `experiments/` until it is decided whether
   D3D11 code accesses the 32-bit raw reinterpretation of BGRA8. This is the
   same class of caveat as in §16 for the cross-order, and its risk is lower (it
   affects only raw-32 reads, not the picture).
@@ -2502,9 +2502,9 @@ as substrings. The final numbers above were counted in reverse order, with
 The whole breakdown is reproducible with one command — `report_stack()` in
 `scripts/fmt-list-gate-check.py`, flag `--stack`.
 
-#### 21.6.4 Experiment 0011: rows for R16_* and R10G10B10A2_*
+#### 21.6.4 exp-11: rows for R16_* and R10G10B10A2_*
 
-`experiments/0011-experiment-ubwc-compat-r16-and-10bit.patch` adds two compat
+`experiments/exp-11-ubwc-compat-r16-and-10bit.patch` adds two compat
 classes to `fd6_ubwc_compat_mode()` that don't exist in the stock table:
 `FD6_UBWC_R16_INT` (5 formats) and `FD6_UBWC_A2B10G10R10_INT` (2 formats).
 
@@ -2566,7 +2566,7 @@ worth recording because the obvious name is wrong:
   the same one that broke in §14 and §21.4. The risk here is lower (all `R16_*`
   have the same swap, WZYX, so there will be no swap asymmetry), but the check
   hasn't been done.
-* **Fast-clear** is not covered, as in 0008.
+* **Fast-clear** is not covered, as in exp-8.
 * **`R10G10B10A2_SNORM` and `_SINT` were not added to the compat class.** 0011
   takes `_UNORM` and `_UINT` because in `fd6_format_table.c` the tiled entries
   exist exactly for them (`FMT` line 209 and `VTC` line 214); `_SNORM` and

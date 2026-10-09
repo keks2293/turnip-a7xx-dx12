@@ -1,4 +1,4 @@
-Experiment 0011 - NOT FOR COMMIT. Rows for R16_* and R10G10B10A2_* in fd6_ubwc_compat_mode().
+Experiment 11 - NOT FOR COMMIT. Rows for R16_* and R10G10B10A2_* in fd6_ubwc_compat_mode().
 
 Why. In the stock fd6_ubwc_compat_mode() (src/freedreno/common/freedreno_ubwc.h)
 there are 28 formats with a non-empty case, and among them there is not a single single-channel
@@ -20,7 +20,7 @@ the UBWC metadata started on its own: the ceiling exists, and it is exactly the 
 removes it.
 The same for R10G10B10A2_UNORM: 0x102000 vs 0x100000.
 
-Unlike experiment 0008, here one does not need to claim that the blob
+Unlike exp-8, here one does not need to claim that the blob
 "allows these, but not a660". Both formats are full-fledged in the texture path: in
 fd6_format_table.c there is VTC(R16_UNORM, ..., WZYX) (line 72) and
 FMT(R10G10B10A2_UNORM, ..., WZYX) at line 209, both have swap WZYX, i.e.
@@ -44,9 +44,9 @@ at all, even though such a format exists in p_format.h. The cases hold
 pipe names, not Vulkan ones.
 
 What stays outside the experiment.
- - fast-clear: a byte roundtrip does not check the clear metadata, as in 0008.
+ - fast-clear: a byte roundtrip does not check the clear metadata, as in exp-8.
  - reinterpretation through an R16_UINT view on an R16_TYPELESS list: exactly the
-   mechanism that turned out broken in 0010 with diverging swaps. Here
+   mechanism that turned out broken in exp-10 with diverging swaps. Here
    the swaps of all R16_* match (WZYX), so there will be no asymmetry, but
    it has to be tested separately.
  - Only R10G10B10A2_UNORM and _UINT are added to the compat row, because

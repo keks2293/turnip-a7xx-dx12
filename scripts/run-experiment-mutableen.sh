@@ -14,7 +14,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="${WORK:-/var/home/armada/opencode/build}"
 MESA="$WORK/mesa-rp6"
-PATCH="$REPO/experiments/0001-experiment-ubwc-all-formats-compatible-a7xx-gen2.patch"
+PATCH="$REPO/experiments/exp-1-ubwc-all-formats-compatible-a7xx-gen2.patch"
 
 echo "### applying the experimental patch"
 cd "$MESA"

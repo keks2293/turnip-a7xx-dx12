@@ -54,7 +54,7 @@ of stack+this patch - the backup was built with it.
 
 No regressions: probes S (0005) and T (0006) are still PASS.
 
-Promoted from experiments/0008-experiment-sfloat-int-ubwc-compat.patch
+Promoted from experiments/exp-8-sfloat-int-ubwc-compat.patch
 (04.10.2026). The fast-clear caveat is kept; analysis - docs/analysis.md,
 section 20.5.
 
