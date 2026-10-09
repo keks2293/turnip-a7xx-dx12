@@ -17,8 +17,8 @@ compression entirely.
 
 That is exactly how five vkd3d classes are built, i.e. precisely what
 D3D12 builds for TYPELESS resources (R32_TYPELESS, R16G16_TYPELESS,
-R32G32_TYPELESS, R16G16B16A16_TYPELESS, R32G32B32A32_TYPELESS). Out of 70
-vkd3d classes, 31 hold UBWC on stock and the remaining 39 lose it; this
+R32G32_TYPELESS, R16G16B16A16_TYPELESS, R32G32B32A32_TYPELESS). Out of 72
+vkd3d classes, 31 hold UBWC on stock and the remaining 41 lose it; this
 patch raises 31 -> 36.
 
 Justification by layouts, not by the blob. UBWC encoding is defined per
