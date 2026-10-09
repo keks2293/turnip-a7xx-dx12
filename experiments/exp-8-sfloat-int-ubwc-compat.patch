@@ -8,8 +8,8 @@ tu6_mutable_format_list_ubwc_compatible() and loses compression entirely.
 
 That is exactly how the five vkd3d classes are built, i.e. precisely what D3D12 builds for
 TYPELESS resources (R32_TYPELESS, R16G16_TYPELESS, R32G32_TYPELESS,
-R16G16B16A16_TYPELESS, R32G32B32A32_TYPELESS). Out of the 70 vkd3d classes on stock
-31 classes keep UBWC, the other 39 lose it; this patch raises 31 -> 36.
+R16G16B16A16_TYPELESS, R32G32B32A32_TYPELESS). Out of the 72 vkd3d classes on stock
+31 classes keep UBWC, the other 41 lose it; this patch raises 31 -> 36.
 
 Justification by layouts, not by blob. UBWC encoding is defined for a format
 class, not for a concrete format, and within one class only
