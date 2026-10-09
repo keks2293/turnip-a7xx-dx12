@@ -1,260 +1,284 @@
-# turnip-a7xx-dx12
+# turnip-patches
 
-Снятие гейта `sparseResidencyImage2D` в Turnip, из-за которого vkd3d не выдаёт
-tiled-ресурсы и feature level 12_0 недостижим на A740 (Adreno gen2).
+Lifting the `sparseResidencyImage2D` gate in Turnip, which kept vkd3d from
+getting tiled resources and made feature level 12_0 unreachable on A740
+(Adreno gen2).
 
-Устройство: Retroid Pocket 6 (aarch64), GPU **Adreno 740 (FD740, a7xx gen2)**,
-Mesa 26.2.3, стоковый драйвер `mesa-vulkan-drivers-26.2.3-1.fc44.armada.aarch64`.
+Device: Retroid Pocket 6 (aarch64), GPU **Adreno 740 (FD740, a7xx gen2)**,
+Mesa 26.2.3, stock driver `mesa-vulkan-drivers-26.2.3-1.fc44.armada.aarch64`.
 
-## Суть в двух абзацах
+## The gist in two paragraphs
 
-Turnip экспортирует `sparseResidencyImage2D` только если
-`info->props.ubwc_all_formats_compatible` — то есть на gen3 (A750+) и новее. На
-gen2 флага нет, поэтому фича не экспортируется, vkd3d не выдаёт
-`VK_IMAGE_TILING_OPTIMAL` и упирается в `TIER_1` вместо `TIER_2`, а
-`TiledResourcesTier` 12_0 недостижим. При этом железо и ядро исправны: VM_BIND и
-PRR на устройстве есть, и драйвер их обнаруживает. Препятствие — только
-экспозиция фичи.
+Turnip only exports `sparseResidencyImage2D` when
+`info->props.ubwc_all_formats_compatible` is set - i.e. on gen3 (A750+) and
+newer. gen2 has no such flag, so the feature is never exported, vkd3d does
+not get `VK_IMAGE_TILING_OPTIMAL` and bottoms out at `TIER_1` instead of
+`TIER_2`, and `TiledResourcesTier` 12_0 is unreachable. The hardware and the
+kernel are fine: VM_BIND and PRR exist on the device and the driver detects
+them. The only obstacle is feature exposure.
 
-Три патча снимают гейт и закрывают дыру, которую снятие открывает: на A740
-sparse-ресурс нельзя делать линейным, иначе он молча читается нулями.
+Three patches lift the gate and close the hole that lifting it opens: on
+A740 a sparse resource must not be linear, otherwise it silently reads back
+as zeros.
 
-## Что здесь
+## What's here
 
 | | |
 |---|---|
-| `docs/analysis.md` | разбор: симптом, причина, измерения, границы применимости, воспроизведение; `docs/rp6-vkd3d-analysis.md` — исходный короткий разбор (21.09.2026), из которого он вырос |
-| `patches/` | 0001–0012 — патчи Mesa, которые ship; `PATCHES.md` — происхождение 0001–0003 |
-| `experiments/` | 0001–0011 — **не** для коммита: воспроизводимые проверки выводов разбора |
-| `tests/` | `rp6-vkd3d-sparse-test.c` + шейдеры; на нём получены все результаты |
-| `scripts/` | сборка и прогоны, включая скрипт эксперимента и запуск игры |
-| `container/` | Containerfile тулчейна (на устройстве нет компилятора) |
-| `image-build/` | копия recipe сборки пакета mesa для образа: пин версии Mesa, как 0001–0003 попадают в RPM |
-| `results/` | отфильтрованные логи прогонов: сток, патчи, оба эксперимента, игра (`results/raw/` — полные, вне git) |
+| `docs/analysis.md` | the analysis: symptom, cause, measurements, applicability boundaries, reproduction; `docs/rp6-vkd3d-analysis.md` - the original short analysis (21.09.2026) it grew out of |
+| `patches/` | 0001-0012 - the Mesa patches that ship; `PATCHES.md` - the origin of 0001-0003 |
+| `experiments/` | 0001-0011 - **not** for commit: reproducible checks of the analysis' conclusions |
+| `tests/` | `rp6-vkd3d-sparse-test.c` + shaders; every result was obtained with it |
+| `scripts/` | build and runs, including the experiment script and game launch |
+| `container/` | toolchain Containerfile (there is no compiler on the device) |
+| `image-build/` | copy of the mesa package build recipe for the image: the Mesa version pin, how 0001-0003 get into the RPM |
+| `results/` | filtered run logs: stock, patches, both experiments, the game (`results/raw/` - full logs, outside git) |
 
-Патчи 0001–0003 — патчи сборки образа ArmadOS, которые ship и здесь, чтобы
-стек был полным в одном месте. Как они попадают в RPM пакета mesa —
-`image-build/build.sh` (копия recipe, самодостаточная, ничего от другого
-репозитория не требуется), пин версии — `image-build/BASE.env`, происхождение
-каждого и внешние источники — `patches/PATCHES.md`. В образе сборки свои копии:
-их нельзя оттуда удалять — сломалась бы сборка образа, в частности ушёл бы
-обход GPU-фaultов A740.
+Patches 0001-0003 are ArmadOS image build patches; they ship here too so
+that the stack is complete in one place. How they get into the mesa RPM -
+`image-build/build.sh` (a recipe copy, self-contained, nothing required
+from any other repository), the version pin - `image-build/BASE.env`, the
+origin of each and the external sources - `patches/PATCHES.md`. The build
+image has its own copies: they must not be removed from there - the image
+build would break, in particular the workaround for A740 GPU faults would
+be lost.
 
-## Патчи
+## Patches
 
-| Патч | Что делает | Проверка (сток → патчи) |
+| Patch | What it does | Verification (stock -> patches) |
 |---|---|---|
-| **0001** | отключает cross-sync графики и sparse-очереди — обход штормов translation-fault на A740 | патч образа, источник и заметки — `patches/PATCHES.md` |
-| **0002** | добавляет chip-id A830 (перенос из ROCKNIX) | патч образа, там же |
-| **0003** | отключает bindless UBO const lowering в ir3 (ROCKNIX, оффсеты под Mesa 26.2.0) | патч образа, там же |
-| **0004** | снимает гейт; добавляет отказ на create для дыры sparse+MUTABLE→linear | `sparseResidencyImage2D` `0 → 1`; дырные create `SUCCESS → FEATURE_NOT_PRESENT` |
-| **0005** | реализует upstream-TODO: uniform-swap списки остаются tiled | проба S: `FAIL` (все нули) → `PASS`, оба вида точные |
-| **0006** | семейство B8G8R8A8 объединяется на INT-совместимом типе | проба T: `memreq 0x100000 → 0x102000` (метаданные UBWC), roundtrip 0/262144 |
-| **0009** | NV12 + MUTABLE: снят только UBWC, тайлинг сохранён (убирает единственный путь в отказ 0004 — vkd3d патчить не нужно) | проба N: `FEATURE_NOT_PRESENT → SUCCESS` |
-| **0010** | список, где одноканальный формат спорит с многоканальным, остаётся tiled: тайлинг списка vkd3d для typeless-BGRA8 под UAV | проба V: список `linear → tiled`; сторона BGRA8 `roundtrip EXACT 0/262144`; R32-вид расходится с linear в `261120/262144` |
-| **0011** | строки для `R16_*` и `R10G10B10A2_*` в `fd6_ubwc_compat_mode()`: в стоковой таблице их нет, и любой список vkd3d с R16 молча теряет UBWC | модель: 36 → 44 UBWC-классов из 72; проба CEIL: потолок есть (`0x82000`/`0x102000`), снимает его гейт. Оговорка ниже |
-| **0012** | `_SFLOAT`-члены в целочисленных UBWC compat-классах `fd6_ubwc_compat_mode()`: список vkd3d со смесью `_SFLOAT` и целых больше не теряет UBWC целиком | проба U: у пяти TYPELESS-классов список сохранил UBWC (`list=0x102000`); изолированный A/B на стеке — ровно 5 строк лога. Оговорка ниже |
+| **0001** | disables cross-sync between graphics and sparse queues - works around translation-fault storms on A740 | image patch, source and notes - `patches/PATCHES.md` |
+| **0002** | adds the A830 chip-id (ported from ROCKNIX) | image patch, same place |
+| **0003** | disables bindless UBO const lowering in ir3 (ROCKNIX, offsets for Mesa 26.2.0) | image patch, same place |
+| **0004** | lifts the gate; adds a create refusal for the sparse+MUTABLE->linear hole | `sparseResidencyImage2D` `0 -> 1`; hole creates `SUCCESS -> FEATURE_NOT_PRESENT` |
+| **0005** | implements the upstream TODO: uniform-swap lists stay tiled | probe S: `FAIL` (all zeros) -> `PASS`, both views exact |
+| **0006** | the B8G8R8A8 family is unified onto an INT-compatible type | probe T: `memreq 0x100000 -> 0x102000` (UBWC metadata), roundtrip 0/262144 |
+| **0009** | NV12 + MUTABLE: only UBWC is dropped, tiling is preserved (removes the only path into the 0004 rejection - no vkd3d patch needed) | probe N: `FEATURE_NOT_PRESENT -> SUCCESS` |
+| **0010** | a list where a single-channel format disagrees with a multi-channel one stays tiled: tiling of the vkd3d typeless-BGRA8 list under UAV | probe V: list `linear -> tiled`; BGRA8 side `roundtrip EXACT 0/262144`; the R32 view diverges from linear in `261120/262144` |
+| **0011** | rows for `R16_*` and `R10G10B10A2_*` in `fd6_ubwc_compat_mode()`: the stock table has none, and any vkd3d list with R16 silently loses UBWC | model: 36 -> 44 UBWC classes out of 72; probe CEIL: a ceiling exists (`0x82000`/`0x102000`), the gate removes it. Caveat below |
+| **0012** | `_SFLOAT` members in the integer UBWC compat classes of `fd6_ubwc_compat_mode()`: a vkd3d list mixing `_SFLOAT` and integers no longer loses UBWC wholesale | probe U: for five TYPELESS classes the list kept UBWC (`list=0x102000`); an isolated A/B on the stack - exactly 5 log lines. Caveat below |
 
-Связи между патчами (подробно — в шапке каждого, строка `Связи:`): 0010 требует
-0005 (тот добавляет `tu6_format_list_swaps_are_uniform()`); 0009 опирается на
-отказ 0004; 0006, 0011 и 0012 правят одну compat-таблицу
-`fd6_ubwc_compat_mode()`, но разные её строки и применяются вместе без
-конфликтов (проверено наложением всего стека 0005–0012 на чистый HEAD). 0007 и
-0008 от всего независимы.
+Relations between the patches (details in each header, the `Relations:`
+line): 0010 requires 0005 (which adds
+`tu6_format_list_swaps_are_uniform()`); 0009 builds on the 0004 refusal;
+0006, 0011 and 0012 edit one compat table `fd6_ubwc_compat_mode()` but
+different rows of it, and apply together without conflicts (verified by
+laying the whole stack 0005-0012 onto a clean HEAD). 0007 and 0008 are
+independent of everything.
 
-0004 нужен только gen2 (FD730/735/740, FD740v3, A32, X1-45, X1-85): на gen3 и
-a8xx он недостижим, там дыры не возникает.
+0004 is needed for gen2 only (FD730/735/740, FD740v3, A32, X1-45, X1-85):
+on gen3 and a8xx it is unreachable, the hole does not occur there.
 
-0009 — общая правка `tu_image.cc`, не quirk по чипу: снимает демоцию NV12 в
-linear, которая не нужна, потому что меняется только сжатие, а не раскладка.
-Кандидат в апстрим.
+0009 is a general fix to `tu_image.cc`, not a per-chip quirk: it removes
+the demotion of NV12 to linear, which is unnecessary because only the
+compression changes, not the layout. An upstream candidate.
 
-0010 накладывается поверх 0005 (того, что добавляет
-`tu6_format_list_swaps_are_uniform()`) и снимает с него требование совпадения
-swap'ов для одноканальных форматов. На тайлинге swap'а для вида не существует:
-`fd6_pipe2swap()` отдаёт WZYX каждому формату, кроме `is_mutable`
-(`fd6_format_table.c:396`), то есть разница `WXYZ` против `WZYX` не имеет там
-представления и не может быть причиной демоции. Форма блока проверяется у всех,
-потому что раскладка тайла зависит только от размера блока (`fd6_layout.c:115`).
-Кросс-порядок `{BGRA8, RGBA8}` и NV12 не задеты: там спор действительно про
-порядок каналов.
+0010 applies on top of 0005 (the one that adds
+`tu6_format_list_swaps_are_uniform()`) and drops its requirement that
+swaps match for single-channel formats. On tiling, no swap for the view
+exists: `fd6_pipe2swap()` returns WZYX to every format except
+`is_mutable` (`fd6_format_table.c:396`), so the `WXYZ` vs `WZYX`
+difference has no representation there and cannot be the cause of
+demotion. The block shape is checked for everyone because the tile
+layout depends only on the block size (`fd6_layout.c:115`). The
+cross-order `{BGRA8, RGBA8}` and NV12 are not affected: there the
+disagreement really is about channel order.
 
-**Оговорка к 0010, измеренная на 740.** Патч меняет видимость через второй вид:
-`R32_UINT`-вид отдаёт слово с обменом байта 0 и байта 2, `261120/262144` слов
-расходятся с линейным путём. Сторона BGRA8 (fill и readback форматом образа) при
-этом не тронута — `EXACT 0/262144`. По D3D12 расхождение безопасно: типизированный
-UAV load BGRA8 возвращает `float4` и читается видом формата самого ресурса, а
-ресурс с `ALLOW_UNORDERED_ACCESS` остаётся типизированным BGRA8, так что сырое
-32-битное чтение через `R32`-вид в D3D12 не выражается. Проверить это по коду
-vkd3d не удалось — исходников на машине нет, поэтому оговорка держится на
-D3D12-спецификации и на замере. Разбор и логи — `docs/analysis.md` §21.
+**Caveat for 0010, measured on the 740.** The patch changes visibility
+through a second view: the `R32_UINT` view returns a word with bytes 0
+and 2 swapped, `261120/262144` words differ from the linear path. The
+BGRA8 side (fill and readback with the image format) is untouched -
+`EXACT 0/262144`. Under D3D12 the divergence is safe: a typed UAV load
+of BGRA8 returns `float4` and is read through a view of the resource's
+own format, and a resource with `ALLOW_UNORDERED_ACCESS` stays typed
+BGRA8, so a raw 32-bit read through an `R32` view is inexpressible in
+D3D12. This could not be verified against vkd3d sources - they are not
+on the machine - so the caveat rests on the D3D12 specification and on
+the measurement. Analysis and logs - `docs/analysis.md` §21.
 
-**0005 и 0006 на реальных потребителях ничего не меняют.** Разбор
-`docs/analysis.md` §16.2 (перебор — `scripts/fmt-list-gate-check.py`): из 72
-классов `tests/vkd3d-fmt-classes.h` на стоке в linear уходят ровно два —
-`B8G8R8A8_TYPELESS+UAV` и `B8G8R8X8_TYPELESS+UAV`, то есть тот самый список,
-который vkd3d строит для typeless-BGRA8 при `ALLOW_UNORDERED_ACCESS`. Из 11
-sRGB-пар Zink до uniform-swap-классификации доходит пять, но GL отдаёт Zink из
-них только `B8G8R8A8_UNORM`, и его пара проходит
-`tu6_mutable_format_list_ubwc_compatible()` ещё на стоке.
+**0005 and 0006 change nothing for real consumers.** Analysis
+`docs/analysis.md` §16.2 (enumeration - `scripts/fmt-list-gate-check.py`):
+of the 72 classes in `tests/vkd3d-fmt-classes.h`, exactly two go to
+linear on stock - `B8G8R8A8_TYPELESS+UAV` and `B8G8R8X8_TYPELESS+UAV`,
+i.e. the very list vkd3d builds for typeless-BGRA8 with
+`ALLOW_UNORDERED_ACCESS`. Of the 11 sRGB pairs Zink reaches the
+uniform-swap classification with five, but GL hands Zink only
+`B8G8R8A8_UNORM` from them, and its pair passes
+`tu6_mutable_format_list_ubwc_compatible()` even on stock.
 
-Оба патча до этих двух классов не доходят по разным причинам. 0005 не помогает,
-потому что расхождение swap'ов там не между двумя многоканальными форматами, а
-между `B8G8R8A8_UNORM` (WXYZ) и одноканальными `R32*` (WZYX) — то есть ровно тот
-случай, который `tu6_format_list_swaps_are_uniform()` по-прежнему отвергает. 0006
-не помогает, потому что гейт падает не на `B8G8R8A8` против `B8G8R8A8_UINT`, а
-на разных compat-классах целиком: `B8G8R8A8` против `R32_INT`. Эти два класса
-закрывает 0010, измерено в §21.3, и там же видно, что изменение касается только
-сырого 32-битного чтения через второй вид. 0006 в рабочий стек ArmadOS
-(`0004, 0005, 0007, 0008, 0009, 0010`) не входит.
+Neither patch reaches those two classes, for different reasons. 0005
+does not help because the swap divergence there is not between two
+multi-channel formats but between `B8G8R8A8_UNORM` (WXYZ) and
+single-channel `R32*` (WZYX) - exactly the case that
+`tu6_format_list_swaps_are_uniform()` still rejects. 0006 does not help
+because the gate falls not on `B8G8R8A8` vs `B8G8R8A8_UINT` but on
+entirely different compat classes: `B8G8R8A8` vs `R32_INT`. Those two
+classes are closed by 0010, measured in §21.3, which also shows that the
+change affects only raw 32-bit reads through the second view. 0006 is
+not part of the ArmadOS working stack
+(`0004, 0005, 0007, 0008, 0009, 0010`).
 
-С 0010 на gen2 **ни один класс `tests/vkd3d-fmt-classes.h` не уходит в linear**:
-линейная демоция для списков форматов vkd3d снята целиком. Остаётся снятие
-UBWC, и это единственный неиспользованный рычаг. На рабочем стеке
-(`0004, 0005, 0006, 0009, 0010, 0011, 0012`) из 72 классов 44 держат UBWC, 0
-линейные, 28 живут в режиме `tiled, no-UBWC` (до 0011 их было 36, до 0012 и
-0010 — 38).
+With 0010 on gen2 **no class of `tests/vkd3d-fmt-classes.h` goes to
+linear**: linear demotion of vkd3d format lists is removed entirely.
+What remains is dropping UBWC, and that is the only unused lever. On
+the working stack (`0004, 0005, 0006, 0009, 0010, 0011, 0012`) out of
+72 classes, 44 hold UBWC, 0 are linear, 28 live in `tiled, no-UBWC`
+mode (before 0011 there were 36; before 0012 and 0010 - 38).
 
-§21.6 разобрал эти 36 и показал, что **26 из них закрыть нечем** — это
-отрицательный результат, а не недоделанная работа. Замер (проба CEIL,
-`results/test-CEIL-*.log`) отделяет гейт от самого формата: при
-`viewFormatCount == 1` гейт возвращает `true` безусловно, поэтому одиночный
-образ идёт мимо него целиком, и `memreq` одиночного формата против линейного —
-это утверждение о железе, а не о правиле.
+§21.6 dissected those 36 and showed that **26 of them cannot be closed
+by anything** - a negative result, not unfinished work. The measurement
+(probe CEIL, `results/test-CEIL-*.log`) separates the gate from the
+format itself: with `viewFormatCount == 1` the gate returns `true`
+unconditionally, so the single image bypasses it entirely, and `memreq`
+of a single format vs linear is a statement about the hardware, not
+about the rule.
 
-Раскладку воспроизводит модель: `scripts/fmt-list-gate-check.py --stack` даёт
-36/0/36 (0004–0010 и 0012 — `_SFLOAT` в модели всегда числился в стеке, теперь
-это ship-патч), с `--exp-0011` (патч 0011) — 44/0/28.
+The model reproduces the layout: `scripts/fmt-list-gate-check.py
+--stack` gives 36/0/36 (0004-0010 and 0012 - `_SFLOAT` was always
+counted in the stack in the model, now it is a ship patch), with
+`--exp-0011` (patch 0011) - 44/0/28.
 
-| что | размер | можно ли править |
+| what | size | can it be fixed |
 |---|---|---|
-| BC1–BC7, NV12, P010, P016 | 18 | **нет.** `vk_format_is_compressed()` и число плоскостей отсекают их раньше, чем гейт успевает подумать |
-| `R8_UNORM/UINT/SINT/SNORM`, `R8_TYPELESS` | 5 | **нет.** `has_8bpp_ubwc = false` на gen2. Потолок memreq есть (`0x40000 → 0x42000` при `FD_DEV_FEATURES=has_8bpp_ubwc=1`), но содержимое под UBWC порчено: nonmut roundtrip `65536/65536`, все нули (`results/test-r8-has8bpp-on.log`). Флаг — защита от порчи (тот же баг, что на a6xx gen2), держать false |
-| `R32G32B32_TYPELESS/UINT/SINT` | 3 | **нет.** Потолка замерами нет |
-| `R16_*`, `R10G10B10A2_*` | 8 | **да.** Потолок есть, его снимает гейт — `patches/0011-…` |
-| `B8G8R8A8/B8G8R8X8_TYPELESS+UAV` | 2 | **нет.** В списке два разных compat-класса — `B8G8R8A8_UNORM` и `R32` |
+| BC1-BC7, NV12, P010, P016 | 18 | **no.** `vk_format_is_compressed()` and the plane count cut them off before the gate even gets to think |
+| `R8_UNORM/UINT/SINT/SNORM`, `R8_TYPELESS` | 5 | **no.** `has_8bpp_ubwc = false` on gen2. A memreq ceiling exists (`0x40000 -> 0x42000` with `FD_DEV_FEATURES=has_8bpp_ubwc=1`), but the contents under UBWC are corrupted: nonmut roundtrip `65536/65536`, all zeros (`results/test-r8-has8bpp-on.log`). The flag protects against corruption (the same bug as on a6xx gen2), keep it false |
+| `R32G32B32_TYPELESS/UINT/SINT` | 3 | **no.** No ceiling in the measurements |
+| `R16_*`, `R10G10B10A2_*` | 8 | **yes.** A ceiling exists and the gate removes it - `patches/0011-...` |
+| `B8G8R8A8/B8G8R8X8_TYPELESS+UAV` | 2 | **no.** The list holds two different compat classes - `B8G8R8A8_UNORM` and `R32` |
 
-Оговорка к 0011 своя: изменение затрагивает в том числе `R16`-виды, а
-содержимое под UBWC байтовым roundtrip не проверялось — проба CEIL меряет
-только `memreq`.
+Caveat for 0011 of its own: the change also affects `R16` views, and the
+contents under UBWC were never checked with a byte roundtrip - probe
+CEIL measures only `memreq`.
 
-Оговорка к 0012 своя: fast-clear не покрыт байтовым roundtrip — драйвер не
-сверяет метаданные clear с интерпретацией формата, и ошибочное значение
-проявится только там, где приложение делает fast-clear через view в
-float-интерпретации. Проба на это не закрыта, риск записан в шапке патча.
+Caveat for 0012 of its own: fast-clear is not covered by a byte
+roundtrip - the driver does not compare clear metadata against the
+format interpretation, and a wrong value will only show where an
+application does a fast-clear through a view with float interpretation.
+No probe closes this; the risk is recorded in the patch header.
 
-Патчи **0007** (`TU_FORCE_PROPS`, только диагностика) и **0008**
-(`gen2`: `has_generic_clear` + `r8g8_faulty_fast_clear_quirk`) лежат в
-`patches/`, но в README-таблицу не вынесены — 0007 по определению не должен
-работать без переменных окружения, 0008 включается в таблицу устройств.
+Patches **0007** (`TU_FORCE_PROPS`, diagnostics only) and **0008**
+(`gen2`: `has_generic_clear` + `r8g8_faulty_fast_clear_quirk`) live in
+`patches/` but are not in the README table - by definition 0007 must
+not work without environment variables, 0008 is switched by the device
+table.
 
-Нумерация `experiments/` и `patches/` **не пересекается по смыслу**: патч
-`0006-turnip-b8g8r8a8-int-compat-type.patch` добавляет
-`FD6_UBWC_B8G8R8A8_INT`, а кросс-порядковый tiled+UBWC — это отдельная
-проба `experiments/experiment-cross-order-list-tiled-ubwc.patch` (номер у
-неё намеренно убран, разбор — `docs/analysis.md`, §16, §16.1 и §16.2:
-потребителей таких списков нет ни у vkd3d, ни у Zink).
+The numbering of `experiments/` and `patches/` **does not overlap by
+meaning**: the patch `0006-turnip-b8g8r8a8-int-compat-type.patch` adds
+`FD6_UBWC_B8G8R8A8_INT`, while the cross-order tiled+UBWC case is a
+separate probe `experiments/experiment-cross-order-list-tiled-ubwc.patch`
+(its number was deliberately removed; analysis - `docs/analysis.md`,
+§16, §16.1 and §16.2: neither vkd3d nor Zink has any consumers of such
+lists).
 
-### Про образ сборки
+### About the build image
 
-Пересобирать драйвер нужно контейнером `localhost/mesa-build-fedora44-wsi-glslang`.
-Образ `mesa-build-fedora44-full` — результат `podman commit` (раздел 15
-`docs/analysis.md` → теперь 19), и в нём нет WSI-devel пакетов, без которых
-ninja падает на линковке. Подробности и проверка содержимого — раздел 19.
+Rebuild the driver with the container
+`localhost/mesa-build-fedora44-wsi-glslang`. The image
+`mesa-build-fedora44-full` is the result of a `podman commit` (section
+15 of `docs/analysis.md` -> now 19), and it lacks the WSI-devel
+packages without which ninja fails at link time. Details and contents
+verification - section 19.
 
-## Соответствие патчей и коммитов mesa
+## Patch-to-mesa commit mapping
 
-Нумерация `0001–00XX` ведётся только здесь, в turnip-patches: это
-внутренняя очередь стека и экспериментов, на неё ссылаются `docs/`,
-`results/`, `experiments/` и шапки патчей. В репозитории
-[keks2293/mesa](https://github.com/keks2293/mesa) коммиты нумерации не
-носят и оформлены в общепринятом mesa-стиле: префикс подсистемы +
-императивное описание, без `000N` и внутренних номеров этапов.
+The `0001-00XX` numbering is kept only here, in turnip-patches: it is
+the internal queue of the stack and experiments, referenced by `docs/`,
+`results/`, `experiments/` and the patch headers. In
+[keks2293/mesa](https://github.com/keks2293/mesa) commits carry no
+numbering and follow the usual mesa style: subsystem prefix + imperative
+description, without `000N` and internal stage numbers.
 
-Ветки в mesa:
+Branches in mesa:
 
-- **`fix-auth`** — автор keks2293, исходные (русские) сообщения;
-- **`fix-auth-en`** — то же дерево, сообщения переведены на английский
-  с сохранением контекста, в mesa-стиле.
+- **`fix-auth`** - author keks2293, the original (Russian) messages;
+- **`fix-auth-en`** - the same tree, messages translated into English
+  with the context preserved, in mesa style.
 
-В этом репозитории та же схема: ветка `fix-auth` — исходные русские
-сообщения, `fix-auth-en` — те же 39 коммитов, все сообщения переведены
-на английский (семантически, с сохранением нумерации `0001–00XX`,
-таблиц, номеров файлов и артефактов).
+This repository follows the same scheme: the `fix-auth` branch carries
+the original Russian messages, `fix-auth-en` the same 39 commits with
+all messages translated into English (semantically, keeping the
+`0001-00XX` numbering, tables, file references and artifacts).
 
-| Patch / этап | Область | Коммиты mesa (`fix-auth` → `fix-auth-en`) | Заголовок в mesa-стиле (EN) |
+| Patch / stage | Area | mesa commits (`fix-auth` -> `fix-auth-en`) | mesa-style subject (EN) |
 |---|---|---|---|
-| 0001–0003 | сборка образа | `3bb596f` → `f16b56c` | `armada: stock image patches 0001-0003` (без изменений) |
-| 0004 | `turnip/sparse` | `4ca598f` → `9ad3ab7` | `turnip: sparse: relax sparse residency gating and refine linear/sparse image creation checks` |
-| dgc M2.0 | `freedreno/dgc` | `e986710` → `64bfdbc` | `freedreno/dgc: prototype GPU-written PM4 via CP_INDIRECT_BUFFER` |
-| dgc M2.1 | `freedreno/dgc` | `1296148` → `c3db727` | `freedreno/dgc: implement VK_EXT_device_generated_commands (features, properties, entry points)` |
-| dgc M2.2 | `freedreno/dgc` | `a5c6af7` → `eb0f1fe` | `freedreno/dgc: add v1-scope validation to reject tokens outside the recorded range` |
-| dgc M2.3 | `freedreno/dgc` | `565d03f` → `6f576ec` | `freedreno/dgc: add GPU-side translator for command sequences to PM4 (WIP: stream path verified, draw submission not yet functional)` |
+| 0001-0003 | image build | `3bb596f` -> `f16b56c` | `armada: stock image patches 0001-0003` (unchanged) |
+| 0004 | `turnip/sparse` | `4ca598f` -> `9ad3ab7` | `turnip: sparse: relax sparse residency gating and refine linear/sparse image creation checks` |
+| dgc M2.0 | `freedreno/dgc` | `e986710` -> `64bfdbc` | `freedreno/dgc: prototype GPU-written PM4 via CP_INDIRECT_BUFFER` |
+| dgc M2.1 | `freedreno/dgc` | `1296148` -> `c3db727` | `freedreno/dgc: implement VK_EXT_device_generated_commands (features, properties, entry points)` |
+| dgc M2.2 | `freedreno/dgc` | `a5c6af7` -> `eb0f1fe` | `freedreno/dgc: add v1-scope validation to reject tokens outside the recorded range` |
+| dgc M2.3 | `freedreno/dgc` | `565d03f` -> `6f576ec` | `freedreno/dgc: add GPU-side translator for command sequences to PM4 (WIP: stream path verified, draw submission not yet functional)` |
 
-DGC-коммиты (этапы M2.0–M2.3) — отдельная линейка разработки в mesa и
-патчам `0001–00XX` не соответствуют; внутренние номера этапов
-сохранены только в исходных сообщениях ветки `fix-auth`. Патчи
-`0005`, `0006`, `0009–0012` в mesa пока не вынесены — маппинг
-дополняется по мере переноса.
+The DGC commits (stages M2.0-M2.3) are a separate development line in
+mesa and do not correspond to patches `0001-00XX`; the internal stage
+numbers survive only in the original messages of the `fix-auth` branch.
+Patches `0005`, `0006`, `0009-0012` have not been moved to mesa yet -
+the mapping grows as things are ported.
 
-## Главное, что проверено измерением
+## What was verified by measurement
 
-- **UBWC на A740 включён** для обычных образов: проба G даёт `0x102000` против
-  `0x100000` у linear-контроля. «UBWC выключается» относится к mutable-спискам
-  без общего compat-типа и к sparse-пути, а не к устройству.
-- **sparse + UBWC — структурный блокер, а не ограничение железа.** Метаданные
-  лежат отдельной плоскостью `fdl_layout`, а `vkGetImageSparseMemoryRequirements`
-  и `fdl_sparse_miptail_*` считают требования только по плоскости данных, так
-  что ни один сообщённый диапазон метаданные не покрывает.
-- **`MUTABLEEN` на gen2 не работает** — это главный результат, закрывающий
-  открытый вопрос. Включение флага ломает чтение, и изоляция экспериментом
-  показывает, что ломается именно бит, а не «что-то ещё включилось»: при
-  принудительном MUTABLEEN `T-tr` даёт 261120/262144 расхождений вместо 0, при
-  неизменной паре форматов. Данные целы, сломан порядок каналов. Подробности и
-  таблицы — `docs/analysis.md`.
-- **8-битное целочисленное сэмплирование на A740 исправно** (проба R: настоящий
-  `R8G8B8A8_UINT` + usampler — EXACT). Кажущаяся аномалия чтения 8888-INT —
-  специфицированное «poison»-значение для комбинации UNORM-образа с usampler,
-  то есть артефакт теста, а не баг.
+- **UBWC is enabled on A740** for regular images: probe G gives
+  `0x102000` vs `0x100000` for the linear control. "UBWC is disabled"
+  refers to mutable lists without a common compat type and to the
+  sparse path, not to the device.
+- **sparse + UBWC is a structural blocker, not a hardware limit.**
+  Metadata lives in a separate `fdl_layout` plane, and
+  `vkGetImageSparseMemoryRequirements` and `fdl_sparse_miptail_*`
+  compute requirements from the data plane only, so no reported range
+  covers the metadata.
+- **`MUTABLEEN` does not work on gen2** - the main result, closing the
+  open question. Enabling the flag breaks reads, and isolating it with
+  an experiment shows that the bit itself breaks, not "something else
+  turned on": with forced MUTABLEEN `T-tr` gives 261120/262144
+  mismatches instead of 0, with the format pair unchanged. The data is
+  intact, the channel order is broken. Details and tables -
+  `docs/analysis.md`.
+- **8-bit integer sampling works correctly on A740** (probe R: a real
+  `R8G8B8A8_UINT` + usampler - EXACT). The apparent 8888-INT read
+  anomaly is the specified "poison" value for an UNORM image with a
+  usampler, i.e. a test artifact, not a bug.
 
-## Быстрый старт
+## Quick start
 
-Краткий перечень; podman-вызовы и порядок шагов — в разделе «Сборка и тесты»
-ниже.
+A short list; the podman invocations and the step order are in the
+"Build and tests" section below.
 
 ```sh
-scripts/build-turnip.sh            # Mesa + патчи, только turnip, KMD=msm
-scripts/rebuild-turnip-msm.sh      # инкрементально, если менялись флаги
-scripts/build-test.sh              # собрать тест (в контейнере)
+scripts/build-turnip.sh            # Mesa + patches, turnip only, KMD=msm
+scripts/rebuild-turnip-msm.sh      # incremental, if only flags changed
+scripts/build-test.sh              # build the test (in the container)
 scripts/run-test.sh ""                       results/test-stock.log
 scripts/run-test.sh out/freedreno_icd.json    results/test-patched.log
-scripts/run-experiment-mutableen.sh          # перепроверить вывод про MUTABLEEN
-scripts/run-game.sh stock 300                # игра (RE4, DX12) на пакетном драйвере
-scripts/run-game.sh patched 120              # игра на патченом (VK_DRIVER_FILES)
+scripts/run-experiment-mutableen.sh          # re-check the MUTABLEEN conclusion
+scripts/run-game.sh stock 300                # the game (RE4, DX12) on the packaged driver
+scripts/run-game.sh patched 120              # the game on the patched one (VK_DRIVER_FILES)
 ```
 
-У запуска игры обязателен `CWD` = папка игры: иначе RE4 пишет пустой
-`local_config.ini` не туда и даёт чёрный экран. Подробности — секция 8 дока.
+Launching the game requires `CWD` = the game folder: otherwise RE4
+writes an empty `local_config.ini` to the wrong place and you get a
+black screen. Details - section 8 of the analysis.
 
-Драйвер подсовывается загрузчику через `VK_DRIVER_FILES` и собственный
-ICD-манифест — `/usr` на устройстве трогать нельзя, а `sudo` требует пароль.
-Секция 7 дока описывает это подробно.
+The driver is handed to the loader through `VK_DRIVER_FILES` and its
+own ICD manifest - `/usr` on the device must not be touched, and
+`sudo` requires a password. Section 7 of the analysis describes this
+in detail.
 
-**Сборку и игру не запускать одновременно.** Память устройства (7.3 ГБ) общая
-с GPU; игра вместе с `ninja -j$(nproc)` уводят систему в OOM — курсор
-замирает, нужна перезагрузка. `scripts/build-turnip.sh` проверяет запущенный
-Wine перед стартом.
+**Do not run the build and the game at the same time.** The device
+memory (7.3 GB) is shared with the GPU; the game together with
+`ninja -j$(nproc)` pushes the system into OOM - the cursor freezes and
+a reboot is needed. `scripts/build-turnip.sh` checks for a running
+Wine before starting.
 
-Образы сборки: `localhost/mesa-build-fedora44-wsi-glslang` (собирается из двух
-Containerfile в `container/`). От `-Dplatforms=` в `scripts/build-turnip.sh`
-зависит не только тест: без WSI-расширений драйвер не проходит `vkCreateInstance`
-под proton, см. секцию 9 дока.
+Build images: `localhost/mesa-build-fedora44-wsi-glslang` (built from
+the two Containerfiles in `container/`). `-Dplatforms=` in
+`scripts/build-turnip.sh` affects more than the test: without the WSI
+extensions the driver fails `vkCreateInstance` under proton, see
+section 9 of the analysis.
 
-## Сборка и тесты
+## Build and tests
 
-Компилятора на устройстве нет: и драйвер, и тест собираются в podman. Обе
-сборки ждут одни и те же монтирования — дерево Mesa в `/src`, каталог
-`build/` в `/out`, репозиторий в `/repo`:
+There is no compiler on the device: both the driver and the test are
+built in podman. Both builds expect the same mounts - the Mesa tree at
+`/src`, the `build/` directory at `/out`, the repository at `/repo`:
 
 ```sh
 REPO=/var/home/armada/opencode/turnip-a7xx-dx12
@@ -262,135 +286,147 @@ WORK=/var/home/armada/opencode/build
 IMG=localhost/mesa-build-fedora44-wsi-glslang
 ```
 
-Каталог `build/ccache` в образе живёт в контейнере, поэтому для кеша между
-прогонами добавляют `-v $HOME/.cache/ccache:/ccache`.
+The `build/ccache` directory lives inside the image container, so to
+share the cache between runs add `-v $HOME/.cache/ccache:/ccache`.
 
-### Драйвер
+### Driver
 
-Исходники с наложенными патчами — `$WORK/mesa-rp6`. Новый патч накладывается и
-откатывается `git apply`; `git checkout` не использовать — он уничтожает
-незакоммиченный стек (так уже терялись 0005–0010).
+Sources with the patches applied - `$WORK/mesa-rp6`. A new patch is
+applied and reverted with `git apply`; do not use `git checkout` - it
+destroys the uncommitted stack (0005-0010 were already lost that way).
 
 ```sh
 cd $WORK/mesa-rp6
-git apply $REPO/patches/0011-turnip-ubwc-compat-r16-and-10bit.patch   # пример
+git apply $REPO/patches/0011-turnip-ubwc-compat-r16-and-10bit.patch   # example
 
-# полная пересборка (rm -rf build + meson setup, минуты):
+# full rebuild (rm -rf build + meson setup, minutes):
 podman run --rm -v "$PWD":/src:Z -v "$WORK":/out:Z -v "$REPO":/repo:Z \
     $IMG bash /repo/scripts/build-turnip.sh
 
-# инкрементальная (та же правка кода, без настройки с нуля):
+# incremental (same code change, no setup from scratch):
 podman run --rm -v "$PWD":/src:Z -v "$WORK":/out:Z -v "$REPO":/repo:Z \
     $IMG bash /repo/scripts/rebuild-turnip-msm.sh
 
-# откат:
+# revert:
 git apply -R $REPO/patches/0011-turnip-ubwc-compat-r16-and-10bit.patch
 ```
 
-На выходе `$WORK/out/libvulkan_freedreno.so` и `$WORK/out/freedreno_icd.json`
-— это и подсовывается загрузчику через `VK_DRIVER_FILES`. Результат искать в
-`out/`, а не в корне `build/`: манифест указывает в `out/`, и устаревшая копия
-выглядит как «патчи не применились» (дока, §6).
+The output is `$WORK/out/libvulkan_freedreno.so` and
+`$WORK/out/freedreno_icd.json` - this is what gets handed to the
+loader via `VK_DRIVER_FILES`. Look for the result in `out/`, not in
+the root of `build/`: the manifest points into `out/`, and a stale
+copy looks like "the patches were not applied" (analysis, §6).
 
-### Тест
+### Test
 
 ```sh
-# сборка (скрипт сам ставит недостающие devel-пакеты, нужен доступ к dnf):
+# build (the script installs missing devel packages itself; dnf access required):
 podman run --rm -v "$REPO/tests":/work:Z -v "$WORK":/out:Z -v "$REPO":/repo:Z \
     $IMG bash /repo/scripts/build-test.sh
 
-# прогон на устройстве — нужны группы video/render, игра должна быть закрыта:
+# run on the device - the video/render groups are required and the game must be closed:
 source $REPO/scripts/env.sh
 $REPO/scripts/run-test.sh ""                $REPO/results/test-stock.log
 $REPO/scripts/run-test.sh "$RP6_TURNIP_ICD" $REPO/results/test-patched.log
 ```
 
-Прогон занимает секунды, лог пишется целиком — фильтровать пробы незачем.
-Готовые логи лежат в `results/`; если теста нет — сборка не прогонялась,
-см. `build-test.sh`.
+The run takes seconds and the log is written in full - there is no
+point filtering probes. Ready-made logs live in `results/`; if a log
+is missing the build was never run, see `build-test.sh`.
 
-### Проверка без железа
+### Hardware-free verification
 
-Модель гейта считает раскладку всех 72 классов vkd3d прямо по исходникам:
+The gate model computes the layout of all 72 vkd3d classes straight
+from the sources:
 
 ```sh
 cd $REPO
-python3 scripts/fmt-list-gate-check.py --stack            # 0004–0010 + 0012: 36/0/36
+python3 scripts/fmt-list-gate-check.py --stack            # 0004-0010 + 0012: 36/0/36
 python3 scripts/fmt-list-gate-check.py --stack --exp-0011  # + 0011: 44/0/28
 ```
 
-### Эксперименты
+### Experiments
 
-Любой патч из `experiments/` проверяется циклом «наложить → пересобрать →
-прогнать → откатить», ожидаемый результат каждого — в `experiments/README.md`:
+Any patch from `experiments/` is checked with an "apply -> rebuild ->
+run -> revert" loop; the expected result of each is in
+`experiments/README.md`:
 
 ```sh
 cd $WORK/mesa-rp6
-git apply $REPO/experiments/<патч>.patch
-# пересобрать драйвер (см. выше), затем прогон теста (см. выше)
-git apply -R $REPO/experiments/<патч>.patch
+git apply $REPO/experiments/<patch>.patch
+# rebuild the driver (see above), then run the test (see above)
+git apply -R $REPO/experiments/<patch>.patch
 ```
 
-### Игры
+### Games
 
 ```sh
-$REPO/scripts/run-game.sh patched 300   # RE4 (DX12), драйвер из build/out
-$REPO/scripts/run-game.sh stock 300     # RE4 на пакетном драйвере
-$REPO/scripts/run-wtno.sh 180           # WNO (OpenGL, turnip не участвует)
+$REPO/scripts/run-game.sh patched 300   # RE4 (DX12), driver from build/out
+$REPO/scripts/run-game.sh stock 300     # RE4 on the packaged driver
+$REPO/scripts/run-wtno.sh 180           # WNO (OpenGL, turnip not involved)
 ```
 
-## Статус
+## Status
 
-**12_0 получен на живом приложении.** Снятие гейта подтверждено дважды:
-измерением на своём тесте (`sparseResidencyImage2D=1`) и логом запущенной
-игры — устройство создаётся на 12_0, отказа `0xc000 is not supported` больше
-нет (остаётся только `0xc100` — это 12_1: `ROVsSupported` требует
-`VK_EXT_fragment_shader_interlock`, в Turnip не реализовано). Разбор —
-раздел 9 дока, лог — `results/game-patched.log`.
+**12_0 achieved on a live application.** The gate lift is confirmed
+twice: by measurement on our own test (`sparseResidencyImage2D=1`) and
+by the log of the running game - the device is created at 12_0, the
+`0xc000 is not supported` rejection is gone (only `0xc100` remains -
+that is 12_1: `ROVsSupported` requires
+`VK_EXT_fragment_shader_interlock`, not implemented in Turnip).
+Analysis - section 9 of the doc, log - `results/game-patched.log`.
 
-Побочный эффект, из-за которого гейт снимали, теперь виден в деле: игра на
-12_0 не доходит до окна. За 200 с не поднимается swapchain, а на экране —
-окно с текстом «your GPU was not supported». Это отказ самой
-игры, а не proton: лог чист, ни одного `err:` и ни одного `Exception`, а игра
-доходит до `d3d12_device_CheckFeatureSupport` и поднимает кеш шейдеров — то
-есть 12_0-путь работает, ломается проверка возможностей.
+The side effect for which the gate was lifted is now visible in
+action: the game on 12_0 does not reach a window. Within 200 s the
+swapchain never comes up, and on screen is a window reading "your GPU
+was not supported". That is the game's own rejection, not proton's:
+the log is clean, not a single `err:` and not a single `Exception`,
+and the game reaches `d3d12_device_CheckFeatureSupport` and raises the
+shader cache - i.e. the 12_0 path works, what breaks is a capability
+check.
 
-**Причина отказа найдена — это не гейт патчей.** Игра требует SM 6.6, а его
-даёт условие 6.2 в vkd3d: `shaderDenormPreserveFloat32`, которое Turnip берёт
-из driconf-опции `tu_enable_softfloat32`, включаемой в
-`00-turnip-defaults.conf` **только для движка `vkd3d`**. Путь к driconf
-зашивается в бинарник из `prefix` сборки, и наша сборка была с
-`prefix=/out/usr` — драйвер искал `/out/usr/share/drirc.d`, которого на
-устройстве нет. Пакетный драйвер собран с `prefix=/usr` и читает
-`/usr/share/drirc.d`. `vulkaninfo` этого не показывал: имя его движка не
-`vkd3d`, поэтому оба драйвера сообщают `Preserve32 = false`.
+**The cause of the rejection was found - it is not the patches'
+gate.** The game requires SM 6.6, which is granted by condition 6.2
+in vkd3d: `shaderDenormPreserveFloat32`, which Turnip takes from the
+driconf option `tu_enable_softfloat32`, enabled in
+`00-turnip-defaults.conf` **only for the `vkd3d` engine**. The path to
+driconf is baked into the binary from the build `prefix`, and our
+build had `prefix=/out/usr` - the driver looked for
+`/out/usr/share/drirc.d`, which does not exist on the device. The
+packaged driver is built with `prefix=/usr` and reads
+`/usr/share/drirc.d`. `vulkaninfo` did not show this: its engine name
+is not `vkd3d`, so both drivers report `Preserve32 = false`.
 
-**Игра работает.** Проверено прогонами: `VKD3D_SHADER_MODEL=6_6` на патченом
-драйвере (`results/game-patched-sm66.log`); сток с
-`VKD3D_FEATURE_LEVEL=12_0` (`results/game-stock-flforce.log`); и чистый
-прогон на пересобранном драйвере — ни `DRIRC_CONFIGDIR`, ни `~/.drirc`, SM 6.6
-поднимается сама, форс не применяется ни разу
+**The game works.** Verified by runs: `VKD3D_SHADER_MODEL=6_6` on the
+patched driver (`results/game-patched-sm66.log`); stock with
+`VKD3D_FEATURE_LEVEL=12_0` (`results/game-stock-flforce.log`); and a
+clean run on the rebuilt driver - neither `DRIRC_CONFIGDIR` nor
+`~/.drirc`, SM 6.6 comes up by itself and the force never applies
 (`results/game-patched-clean.log`).
 
-Разбор — раздел 10 дока. Правка сборки (`--prefix=/usr` в
-`scripts/build-turnip.sh`) убирает причину: драйвер читает тот же
-`/usr/share/drirc.d`, что и пакетный, и SM 6.6 поднимается сам при любом
-запуске — из Heroic, из консоли, из наших скриптов. Промежуточные костыли
-(`DRIRC_CONFIGDIR`, `~/.drirc`) удалены, а не оставлены «про запас»: они
-маскировали бы причину, и следующая отладка искала бы её не там.
+Analysis - section 10 of the doc. The build fix (`--prefix=/usr` in
+`scripts/build-turnip.sh`) removes the cause: the driver reads the
+same `/usr/share/drirc.d` as the packaged one, and SM 6.6 comes up by
+itself on any launch - from Heroic, from a console, from our scripts.
+The interim workarounds (`DRIRC_CONFIGDIR`, `~/.drirc`) were removed
+rather than kept "just in case": they would mask the cause, and the
+next debugging session would look for it in the wrong place.
 
-**Производительность.** 13 fps в игре — ограничение по GPU, а не vsync и не
-CPU: `gpu_load` 85–99%, ядро 680 МГц, 68–71 °C без троттлинга, в меню
-55–70 fps. Меряется через MangoHud (`HUD=1` — оверлей, `HUDLOG=90` — ещё и
-CSV), разбор в разделе 11. Открытым остаётся, сколько из этих 13 fps съедает
-`softfloat32` — для этого нужен встроенный бенчмарк RE4, а не ручная сцена.
+**Performance.** 13 fps in the game is a GPU limit, not vsync and not
+CPU: `gpu_load` 85-99%, core 680 MHz, 68-71 °C without throttling,
+55-70 fps in the menu. Measured via MangoHud (`HUD=1` - overlay,
+`HUDLOG=90` - also CSV), analysis in section 11. Still open: how much
+of those 13 fps `softfloat32` eats - that needs RE4's built-in
+benchmark, not a manual scene.
 
-**Проба DX11 не удалась:** `[Render] Capability` в `local_config.ini` игра не
-читает и перезаписывает обратно (раздел 11.2). Ключ командной строки не
-опробован. Смысл такой проверки ограничен: DX11 идёт через DXVK и наших
-патчей не касается — проверять их нужно на другой DX12-игре.
+**The DX11 probe failed:** the game does not read
+`[Render] Capability` from `local_config.ini` and overwrites it back
+(section 11.2). The command-line key was not tried. The value of such
+a check is limited: DX11 goes through DXVK and does not touch our
+patches - they must be checked on a different DX12 game.
 
-Ещё не проверено: реакция vkd3d на `VK_ERROR_FEATURE_NOT_PRESENT` при
-mutable+sparse без format list — три пробы (E, F, B), которые на стоке
-создавались успешно, теперь отклоняются по замыслу 0004, а vkd3d ставит
-`MUTABLE_FORMAT_BIT` широко и не всегда со списком.
+Still unverified: vkd3d's reaction to `VK_ERROR_FEATURE_NOT_PRESENT`
+for mutable+sparse without a format list - three probes (E, F, B)
+that used to be created successfully on stock are now rejected by
+design of 0004, while vkd3d sets `MUTABLE_FORMAT_BIT` broadly and not
+always together with a list.
