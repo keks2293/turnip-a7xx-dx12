@@ -1657,17 +1657,17 @@ screenshots from 15.3.
 ## 16. mixed-swap (cross-order experiment): tiled+UBWC for {BGRA8, RGBA8}
 
 > Here and below "cross-order experiment" is **not patch 0006** (that one adds
-> `FD6_UBWC_B8G8R8A8_INT`, see §5 and `patches/`), but a separate probe in
-> `experiments/`. It was originally `0006-experiment-…`, because of which it got
-> confused with the patch; the number was removed, the name now states the
-> essence.
+> `FD6_UBWC_B8G8R8A8_INT`, see §5 and `patches/`), but the probe
+> `experiments/0006-experiment-cross-order-list-tiled-ubwc.patch`. The
+> experiment numbering is its own and independent of `patches/`: which
+> experiment went into which patch - the lineage table in the main README.
 
 One reinterpretation scenario remained unused: a format list with the same
 block geometry but a different channel order —
 `{B8G8R8A8_UNORM, R8G8B8A8_UNORM}`. The control (stock and patches
 0004–0008): `swaps_are_uniform()` rejects such a list → `tu_image_init()`
 turns off UBWC and forcibly puts the image in linear. The cross-order
-experiment (`experiments/experiment-cross-order-list-tiled-ubwc.patch`)
+experiment (`experiments/0006-experiment-cross-order-list-tiled-ubwc.patch`)
 introduces the predicate `tu6_format_list_same_shape()` (all formats of the
 list are the same texel block: channels, bits, shape) and in the mutable branch
 leaves such a list tiled+UBWC; the sparse query
@@ -1712,7 +1712,7 @@ What follows from this:
   `FORMAT_NOT_SUPPORTED` — create and query diverged. `F` (NULL list) was not
   touched, the rest of the test output didn't change (the same 6 `FAIL`s).
 
-Summary: rollback via `git apply -R experiments/experiment-cross-order-…`,
+Summary: rollback via `git apply -R experiments/0006-experiment-cross-order-…`,
 rebuild the driver, a control run matched the control byte for byte
 (`postrev` == `control`), the mesa tree files were compared with the backup —
 identical. Conclusion: "cross-order tiled+UBWC" is mechanically achievable in
