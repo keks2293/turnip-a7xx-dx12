@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Сжимает полный лог прогона игры (raw) до значимых строк.
+# Condenses a full game run log (raw) to the meaningful lines.
 #
-# Полный лог — это stdout+stderr proton/wine: тысячи строк вида
-#   D 138 Load module comctl32.dll ...            (загрузка DLL)
-#   D 168 Exception: Code: C0000005 ...            (FEX гоняет x86-код)
-#   1262.1:...:warn:vkd3d-proton:...does not exist (промах кеша шейдеров)
-# Они не несут информации о том, почему игра не запустилась, и перекрывают то,
-# что несёт: отказ vkd3d по feature level, создание и пересоздание swapchain,
-# отказ DXVK на vkCreateInstance.
+# The full log is stdout+stderr of proton/wine: thousands of lines like
+#   D 138 Load module comctl32.dll ...            (DLL loading)
+#   D 168 Exception: Code: C0000005 ...            (FEX runs x86 code)
+#   1262.1:...:warn:vkd3d-proton:...does not exist (shader cache miss)
+# They carry no information about why the game failed to start and cover up
+# what does: the vkd3d feature level rejection, swapchain creation and
+# recreation, the DXVK rejection on vkCreateInstance.
 #
-#   scripts/curate-game-log.sh <raw.log> [out.log]   # по умолчанию в stdout
+#   scripts/curate-game-log.sh <raw.log> [out.log]   # defaults to stdout
 set -euo pipefail
 
 IN="${1:?usage: curate-game-log.sh <raw.log> [out.log]}"
-[ -r "$IN" ] || { echo "нет файла: $IN" >&2; exit 1; }
+[ -r "$IN" ] || { echo "no such file: $IN" >&2; exit 1; }
 
 grep -vE \
   -e 'Load module ' \
@@ -22,13 +22,13 @@ grep -vE \
   -e '^(fixme|trace):' \
   "$IN" \
 | awk '
-    # Промахи кеша шейдеров: строк тысячи, а различие только в имени
-    # пайплайна. Считаем их и в конце выдаём итоговое число.
+    # Shader cache misses: thousands of lines, and the only difference is the
+    # pipeline name. Count them and report the total at the end.
     /d3d12_pipeline_library_load_pipeline: Pipeline .* does not exist\.$/ { n++; next }
     { print }
     END {
       if (n)
-        printf "# [свёрнуто %d строк: d3d12_pipeline_library_load_pipeline ... does not exist]\n", n
+        printf "# [folded %d lines: d3d12_pipeline_library_load_pipeline ... does not exist]\n", n
     }
   ' \
 > "${2:-/dev/stdout}"

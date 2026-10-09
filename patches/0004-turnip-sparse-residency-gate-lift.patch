@@ -1,9 +1,9 @@
-0004: снятие гейта sparseResidencyImage2D и отказ в create для дыры
+0004: lift the sparseResidencyImage2D gate and refuse creation of the hole
 sparse + MUTABLE -> linear.
 
-Связи: самостоятельный, ложится на чистый HEAD. 0009 опирается на
-введённый здесь отказ — снимает единственный достижимый из vkd3d путь
-в него.
+Relations: standalone, applies on a clean HEAD. 0009 builds on the
+rejection introduced here - it removes the only path reachable from
+vkd3d into it.
 
 diff --git a/src/freedreno/vulkan/tu_device.cc b/src/freedreno/vulkan/tu_device.cc
 index e8ef94037dc..3c904bf3d70 100644

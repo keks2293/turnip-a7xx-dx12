@@ -1,42 +1,42 @@
-Эксперимент: включить _FLOAT-членов в целочисленные UBWC compat-классы.
+Experiment: include _FLOAT members in the integer UBWC compat classes.
 
-Зачем. Сток держит каждый _FLOAT вне fd6_ubwc_compat_mode(), и для R32_FLOAT
-прямо пишет «a630 blob allows these, but not a660». a660 — это наше семейство
-gen2, так что решение осознанное, а не недосмотр. Но из-за него любой список
-форматов, в котором _SFLOAT смешан с целыми, проваливает
-tu6_mutable_format_list_ubwc_compatible() и теряет компрессию целиком.
+Why. Stock keeps every _FLOAT out of fd6_ubwc_compat_mode(), and for R32_FLOAT
+it says directly "a630 blob allows these, but not a660". a660 is our gen2
+family, so the decision is deliberate, not an oversight. But because of it any format
+list in which _SFLOAT is mixed with integers fails
+tu6_mutable_format_list_ubwc_compatible() and loses compression entirely.
 
-Именно так устроены пять классов vkd3d, то есть ровно то, что D3D12 строит для
-TYPELESS-ресурсов (R32_TYPELESS, R16G16_TYPELESS, R32G32_TYPELESS,
-R16G16B16A16_TYPELESS, R32G32B32A32_TYPELESS). Из 70 классов vkd3d на стоке
-31 класс держит UBWC, остальные 39 теряют; этот патч поднимает 31 -> 36.
+That is exactly how the five vkd3d classes are built, i.e. precisely what D3D12 builds for
+TYPELESS resources (R32_TYPELESS, R16G16_TYPELESS, R32G32_TYPELESS,
+R16G16B16A16_TYPELESS, R32G32B32A32_TYPELESS). Out of the 70 vkd3d classes on stock
+31 classes keep UBWC, the other 39 lose it; this patch raises 31 -> 36.
 
-Обоснование по layouts, а не по blob. UBWC-кодирование задаётся на класс
-форматов, а не на конкретный формат, и внутри одного класса различаются только
-размеры каналов. _SFLOAT-член имеет ровно ту же раскладку, что и целочисленный
-член того же typeless-формата: те же биты на канал, тот же swizzle, та же
-tiled-разметка. Каст в Vulkan — это переинтерпретация тех же битов, а не
-перестановка каналов, поэтому fast-clear и декодирование секторов не могут
-разойтись. Z32_FLOAT намеренно остаётся UNKNOWN: он не входит ни в одно
-цветное typeless-семейство, и у глубины своя семантика очистки.
+Justification by layouts, not by blob. UBWC encoding is defined for a format
+class, not for a concrete format, and within one class only
+the channel sizes differ. An _SFLOAT member has exactly the same layout as the integer
+member of the same typeless format: the same bits per channel, the same swizzle, the same
+tiled markup. A cast in Vulkan is a reinterpretation of the same bits, not a
+channel permutation, so fast-clear and sector decoding cannot
+diverge. Z32_FLOAT deliberately stays UNKNOWN: it is not part of any
+colour typeless family, and depth has its own clear semantics.
 
-Что не проверяется этим патчем (и остаётся риском): драйвер не сверяет
-содержимое метаданных UBWC fast-clear с интерпретацией формата, так что
-ошибочное значение clear может проявиться только там, где приложение делает
-fast-clear через view в float-интерпретации. Байтового roundtrip это не
-ловит.
+What this patch does not verify (and the risk that remains): the driver does not check
+the contents of the UBWC fast-clear metadata against the format interpretation, so
+a wrong clear value may show up only where the application does a
+fast-clear through a view in a float interpretation. A byte roundtrip does not
+catch it.
 
-Замер на Adreno 740 (chip_id 0x43050a01), пробы U в
-tests/rp6-vkd3d-sparse-test.c, по пять TYPELESS-классам:
+Measurement on Adreno 740 (chip_id 0x43050a01), probes U in
+tests/rp6-vkd3d-sparse-test.c, for the five TYPELESS classes:
 
-  сток (0004-0006):  list=0x100000 против nonmut=0x102000  -> список снял UBWC
-  с патчем:          list=0x102000                            -> список сохранил
+  stock (0004-0006): list=0x100000 vs nonmut=0x102000   -> the list dropped UBWC
+  with the patch:    list=0x102000                       -> the list kept it
 
-  roundtrip (CopyBufferToImage -> CopyImageToBuffer, побайтовое сравнение):
-  сток   linear/nonmut/list  0/262144, 0/262144, 0/262144    EXACT
-  патч   linear/nonmut/list  0/262144, 0/262144, 0/262144    EXACT
+  roundtrip (CopyBufferToImage -> CopyImageToBuffer, byte comparison):
+  stock  linear/nonmut/list  0/262144, 0/262144, 0/262144    EXACT
+  patch  linear/nonmut/list  0/262144, 0/262144, 0/262144    EXACT
 
-Регрессий нет: пробы S (0005) и T (0006) по-прежнему PASS.
+No regressions: probes S (0005) and T (0006) still PASS.
 
 --- a/src/freedreno/common/freedreno_ubwc.h
 +++ b/src/freedreno/common/freedreno_ubwc.h

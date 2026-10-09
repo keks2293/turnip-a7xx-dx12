@@ -1,7 +1,8 @@
-0006: тип FD6_UBWC_B8G8R8A8_INT в compat-таблице freedreno_ubwc.h.
+0006: the FD6_UBWC_B8G8R8A8_INT type in the compat table of freedreno_ubwc.h.
 
-Связи: самостоятельный. Тот же файл правят 0011 и 0012 (другие строки
-enum и switch) — все три применяются вместе без конфликтов.
+Relations: standalone. The same file is edited by 0011 and 0012 (other
+rows of the enum and the switch) - all three apply together without
+conflicts.
 
 diff --git a/src/freedreno/common/freedreno_ubwc.h b/src/freedreno/common/freedreno_ubwc.h
 index a85ea6f26a3..45cb608db87 100644

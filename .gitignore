@@ -4,8 +4,8 @@ out/
 *.so
 rp6-vkd3d-sparse-test
 
-# Полные логи прогонов игры: тысячи строк шума wine/FEX. В git идёт
-# отфильтрованная версия — results/game-<mode>.log (scripts/curate-game-log.sh).
+# Full game-run logs: thousands of lines of wine/FEX noise. Git gets the
+# filtered version - results/game-<mode>.log (scripts/curate-game-log.sh).
 results/raw/
 
 __pycache__/

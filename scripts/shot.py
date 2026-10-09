@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Снимок экрана через xdg-desktop-portal (org.freedesktop.portal.Screenshot).
+"""Screenshot via xdg-desktop-portal (org.freedesktop.portal.Screenshot).
 
-Нужен потому, что KWin ScreenShot2 отклоняет прямые вызовы:
+Needed because KWin ScreenShot2 rejects direct calls:
 "Error.NoAuthorized: The process is not authorized to take a screenshot".
-Портал — единственный авторизованный путь на Wayland, и он возвращает
-готовый файл по URI, так что ничего декодировать не приходится.
+The portal — the only authorized path on Wayland, and it returns
+a ready file by URI, so nothing has to be decoded.
 
-Запуск: shot.py out.png [таймаут-секунд]
+Run: shot.py out.png [timeout-seconds]
 """
 import shutil
 import sys
@@ -24,9 +24,9 @@ def main(out_path, timeout_s=45):
     gloop = dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus(mainloop=gloop)
 
-    # Подписываемся ДО вызова: иначе Response может прийти раньше, чем
-    # подключимся. connect_signal есть только у ProxyObject, у Interface его
-    # нет — его вызов ушёл бы в шину как обычный метод и падал с TypeError.
+    # Subscribe BEFORE the call: otherwise the Response may arrive before we
+    # connect. connect_signal exists only on ProxyObject, Interface has it
+    # not — its call would go to the bus as a normal method and fail with TypeError.
     def on_response(response, results, path=None):
         if path is not None and str(path) != str(result.get("path")):
             return
@@ -57,16 +57,16 @@ def main(out_path, timeout_s=45):
     loop.run()
 
     if "results" not in result:
-        print("портал не ответил за %d с (вероятно, ждёт согласия в диалоге)"
+        print("portal did not reply within %d s (probably waiting for consent in the dialog)"
               % timeout_s, file=sys.stderr)
         return 2
     if result["response"] != 0:
-        print("портал отклонил: response=%d" % result["response"], file=sys.stderr)
+        print("portal rejected: response=%d" % result["response"], file=sys.stderr)
         return 1
 
     uri = str(result["results"].get("uri", ""))
     if not uri:
-        print("в ответе нет uri: %r" % (dict(result["results"]),), file=sys.stderr)
+        print("no uri in the reply: %r" % (dict(result["results"]),), file=sys.stderr)
         return 1
     path = urllib.parse.unquote(uri[len("file://"):])
     shutil.copyfile(path, out_path)

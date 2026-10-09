@@ -10,23 +10,23 @@ RUN dnf -y install \
         byacc bison flex \
     && dnf clean all
 
-# Блок WSI-пакетов нужен для -Dplatforms=x11,wayland. Без него мезон
-# конфигурирует сборку, но в готовом драйвере не будет ни
-# VK_KHR_xcb_surface, ни VK_KHR_wayland_surface, и любое DX12-приложение
-# под proton падает на создании инстанса (см. scripts/build-turnip.sh).
-# libxcb-devel в Fedora закрывает и xcb-randr/dri3/present/shm/xfixes,
+# The WSI package block is needed for -Dplatforms=x11,wayland. Without it meson
+# configures the build, but the finished driver will have neither
+# VK_KHR_xcb_surface nor VK_KHR_wayland_surface, and any DX12 application
+# under proton crashes on instance creation (see scripts/build-turnip.sh).
+# libxcb-devel in Fedora also covers xcb-randr/dri3/present/shm/xfixes,
 # libX11-devel — x11-xcb, libXrandr-devel — xrandr (xlib-lease, meson.build:2375).
-# Имена пакетов пишутся с точным регистром: в Fedora это libXrandr-devel,
-# а не libxrandr-devel, и dfn-metadata нечувствителен к регистру, поэтому
-# опечатка даёт "No match for argument" вместо понятной ошибки.
+# Package names are written with exact case: in Fedora it is libXrandr-devel,
+# not libxrandr-devel, and dnf metadata is case-insensitive, so a typo
+# gives "No match for argument" instead of an understandable error.
 #
-# byacc/bison/flex обязательны: без них `meson setup` обрывается на
-# meson.build:2216 (генерация парсеров), и до WSI дело не доходит.
-# ccache без них бесполезен, поэтому они ставятся вместе с тулчейном.
+# byacc/bison/flex are mandatory: without them `meson setup` aborts at
+# meson.build:2216 (parser generation), and it never gets to WSI.
+# ccache is useless without them, so they are installed together with the toolchain.
 
-# ccache ускоряет цикл «патч -> пересборка» (scripts/rebuild-turnip-msm.sh),
-# который иначе каждый раз компилирует Mesa заново. Кэш общий и переживает
-# пересоздание контейнера, если смонтировать ~/.cache/ccache.
+# ccache speeds up the "patch -> rebuild" loop (scripts/rebuild-turnip-msm.sh),
+# which otherwise compiles Mesa from scratch every time. The cache is shared and
+# survives container recreation if ~/.cache/ccache is mounted.
 ENV CCACHE_DIR=/ccache
 ENV CC="ccache gcc"
 ENV CXX="ccache g++"

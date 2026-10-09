@@ -1,35 +1,35 @@
-Mixed-swap (S3): небольшой HW-эксперимент — оставить tiled+UBWC для
-same-shape mixed-swap списков вида {B8G8R8A8_UNORM, R8G8B8A8_UNORM}.
+Mixed-swap (S3): a small HW experiment - keep tiled+UBWC for
+same-shape mixed-swap lists of the form {B8G8R8A8_UNORM, R8G8B8A8_UNORM}.
 
-Контроль (0004-0008): такой список «не uniform» → tu_image_init() выключает
-UBWC и принудительно кладёт образ в линей (memreq 0x100000). Список описывает
-один и тот же texel-блок, расходящийся только в порядке каналов, поэтому
-гипотеза: вид образа применяет swap при сэмплировании, и тайлинг+UBWC
-переживают кросс-порядковую интерпретацию.
+Control (0004-0008): such a list is "not uniform" → tu_image_init() disables
+UBWC and forcibly puts the image into linear (memreq 0x100000). The list describes
+one and the same texel block, differing only in channel order, so the
+hypothesis: the image view applies the swap at sampling time, and tiling+UBWC
+survive the cross-order interpretation.
 
-Правки (только non-sparse путь; sparse-запрос S2 намеренно не трогаем):
-  - tu_formats.cc/h: новый признак tu6_format_list_same_shape() — все форматы
-    списка одинаковой геометрии блока (каналы/биты/форма);
-  - tu_image.cc: в mutable-ветке для cross-order списка (has_swaps &&
-    !uniform && same_shape) не выключать UBWC и не принуждать линей.
+Changes (only the non-sparse path; the sparse query S2 is deliberately untouched):
+  - tu_formats.cc/h: a new flag tu6_format_list_same_shape() - all formats of
+    the list have the same block geometry (channels/bits/shape);
+  - tu_image.cc: in the mutable branch for a cross-order list (has_swaps &&
+    !uniform && same_shape) do not disable UBWC and do not force linear.
 
-Прогон: scripts/build-test.sh (проба S3) + scripts/run-test.sh <icd>.
-Ожидание: S3 memreq 0x102000 (UBWC), base view EXACT, cross view = identity
-(== fill2, как в контроле), raw-перенос байт-в-байт. Любая иная классификация
-cross view или порча raw = UBWC cross-order мусор → откат.
+Run: scripts/build-test.sh (probe S3) + scripts/run-test.sh <icd>.
+Expectation: S3 memreq 0x102000 (UBWC), base view EXACT, cross view = identity
+(== fill2, as in the control), raw transfer byte-for-byte. Any other classification of the
+cross view or corruption of raw = UBWC cross-order garbage → rollback.
 
-Прогон:
+Run:
     cd /var/home/armada/opencode/build/mesa-rp6
-    git apply experiments/0006-... (уже наложен в рабочем дереве)
+    git apply experiments/0006-... (already applied in the working tree)
     podman run --rm -v $PWD:/src:Z -v /var/home/armada/opencode/build:/out:Z \
       localhost/mesa-build-fedora44-wsi-glslang \
       bash -c 'cd /src && ninja -C build -j4 src/freedreno/vulkan/libvulkan_freedreno.so \
                && cp build/src/freedreno/vulkan/libvulkan_freedreno.so /out/out/'
     scripts/run-test.sh .../freedreno_icd.json results/test-s3-ubwc.log
 
-Откат: git apply -R experiments/0006-... (git checkout не использовать:
-в файлах лежат незакоммиченные 0005-0008), затем пересборка и контрольный
-прогон — S3 обязан вернуться к линейному контролю.
+Rollback: git apply -R experiments/0006-... (do not use git checkout:
+the files hold uncommitted 0005-0008), then rebuild and run the control
+run - S3 must return to the linear control.
 
 --- a/src/freedreno/vulkan/tu_formats.h
 +++ b/src/freedreno/vulkan/tu_formats.h

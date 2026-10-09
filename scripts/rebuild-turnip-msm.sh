@@ -1,18 +1,18 @@
 #!/bin/bash
-# Пересборка turnip с KMD=msm (дефолт Mesa). Устройство RP6 — обычный
-# DRM-узел, /sys/class/kgsl отсутствует, поэтому kgsl-KMD не находит GPU.
+# Rebuild turnip with KMD=msm (the Mesa default). The RP6 device is a plain
+# DRM node, /sys/class/kgsl is absent, so the kgsl KMD cannot find the GPU.
 set -euxo pipefail
 
 cd /src
 
-# Опция меняет набор TU_DEBUG/KMD-исходников, но не трогает NIR/compiler —
-# поэтому хватит переконфигурации существующего build-каталога.
+# The option changes the set of TU_DEBUG/KMD sources but does not touch NIR/compiler —
+# so reconfiguring the existing build directory is enough.
 meson configure build -Dfreedreno-kmds=msm
 
 ninja -C build -j"$(nproc)" src/freedreno/vulkan/libvulkan_freedreno.so
 
-# /out смонтирован в корень build/, а манифест ICD указывает на build/out/,
-# поэтому копируем именно туда — иначе загрузчик подхватит старый бинарник.
+# /out is mounted at the root of build/, and the ICD manifest points at build/out/,
+# so we copy there specifically — otherwise the loader would pick up the old binary.
 mkdir -p /out/out
 rm -f /out/out/libvulkan_freedreno.so
 cp -v build/src/freedreno/vulkan/libvulkan_freedreno.so /out/out/

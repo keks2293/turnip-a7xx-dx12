@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
-"""Кто на самом деле попадает в linear при mutable-списке форматов.
+"""Who actually ends up in linear with a mutable format list.
 
-Переносит на Python ровно те предикаты, которые решают судьбу образа в
-`tu_image_init()` (src/freedreno/vulkan/tu_image.cc) и
+Transfers to Python exactly those predicates that decide the fate of an image in
+`tu_image_init()` (src/freedreno/vulkan/tu_image.cc) and
 `tu6_mutable_format_list_forces_linear()` (tu_formats.cc):
 
-  tu6_mutable_format_list_ubwc_compatible()  -> ранний выход, весь блок пропускается
+  tu6_mutable_format_list_ubwc_compatible()  -> early exit, the whole block is skipped
   fd6_ubwc_compat_mode()                     -> src/freedreno/common/freedreno_ubwc.h
-  tu6_format_list_has_swaps()                -> swap из fd6_format_table.c, TILE6_LINEAR
+  tu6_format_list_has_swaps()                -> swap from fd6_format_table.c, TILE6_LINEAR
   tu6_format_list_reinterprets_r8g8_r16()    -> blocksize / nr_components
-  tu6_format_list_swaps_are_uniform()        -> патч 0005
-  NV12-ветка                                 -> патч 0009 снимает force_linear_tile
-  FD6_UBWC_B8G8R8A8_INT                      -> патч 0006
+  tu6_format_list_swaps_are_uniform()        -> patch 0005
+  NV12 branch                                -> patch 0009 removes force_linear_tile
+  FD6_UBWC_B8G8R8A8_INT                      -> patch 0006
 
-Эксперименты (нумерация experiments/ своя, флаги --exp-*):
-  --exp-0009  одноканальный формат (R32_UINT и т.п.) не выводит список в
-             linear: у него нет порядка каналов, о котором можно спорить.
-             Меняет tu6_format_list_swaps_are_uniform().
-  --exp-0010  в ветке !mutable_ubwc_fc выставляется is_mutable = true
-             (MUTABLEEN без UBWC). Меняет только tu_image_init().
+Experiments (numbering of experiments/ is its own, flags --exp-*):
+  --exp-0009  a single-channel format (R32_UINT and the like) does not push the
+             list into linear: it has no channel order to argue about.
+             Changes tu6_format_list_swaps_are_uniform().
+  --exp-0010  in the !mutable_ubwc_fc branch is_mutable = true is set
+             (MUTABLEEN without UBWC). Changes only tu_image_init().
 
-Ранний выход — главное: если список «UBWC-совместимый», до `has_swaps` дело
-не доходит, и ни сток, ни патчи ничего не меняют. Перебор, который этот
-ранний выход игнорирует, даёт неверные числа (так получилось в первом
-разборе §16.2).
+The early exit is the main thing: if the list is "UBWC-compatible", `has_swaps`
+is never reached, and neither the stock nor the patches change anything. The
+enumeration that ignores this early exit gives wrong numbers (that is what
+happened in the first analysis of §16.2).
 
-Свойства GPU берутся из freedreno_devices.py: FD740 = [a7xx_base, a7xx_gen2],
-поэтому ubwc_unorm_snorm_int_compatible = True, ubwc_all_formats_compatible = 0.
+GPU properties come from freedreno_devices.py: FD740 = [a7xx_base, a7xx_gen2],
+so ubwc_unorm_snorm_int_compatible = True, ubwc_all_formats_compatible = 0.
 
-Запуск:
+Run:
   scripts/fmt-list-gate-check.py [--table PATH/fd6_format_table.c]
                                  [--classes tests/vkd3d-fmt-classes.h]
 """
@@ -45,22 +45,22 @@ DEFAULT_TABLE = "/var/home/armada/opencode/build/mesa-rp6/src/freedreno/fdl/fd6_
 UNKNOWN = "UNKNOWN_COMPAT"
 NV12_VK = "G8_B8R8_2PLANE_420_UNORM"
 
-# a7xx_gen2 (FD740) из src/freedreno/common/freedreno_devices.py.
-# has_8bpp_ubwc в a7xx-цепочке ([a7xx_base, a7xx_gen2]) нигде не стоит —
-# C-структура зануляется, т.е. False по умолчанию (НЕ наследуется от a6xx_gen2).
-# supports_uav_ubwc = True стоит прямо в a7xx_gen2, то есть у UAV-образов гейт
-# списка — действительно ограничивающий фактор, а у 8-битных на блок — нет.
-# Замер (2026-10-02, FD_DEV_FEATURES=has_8bpp_ubwc=1): потолок memreq у R8 есть
-# (0x40000 -> 0x42000), но содержимое под UBWC порчено (roundtrip — все нули),
-# т.е. флаг — защита от порчи, держать False. results/test-r8-has8bpp-*.log.
+# a7xx_gen2 (FD740) from src/freedreno/common/freedreno_devices.py.
+# has_8bpp_ubwc in the a7xx chain ([a7xx_base, a7xx_gen2]) is nowhere set —
+# the C struct is zero-filled, i.e. False by default (NOT inherited from a6xx_gen2).
+# supports_uav_ubwc = True sits right in a7xx_gen2, so for UAV images the list
+# gate is indeed the limiting factor, while for the 8-bits-per-block ones it is not.
+# Measurement (2026-10-02, FD_DEV_FEATURES=has_8bpp_ubwc=1): the memreq ceiling for R8 exists
+# (0x40000 -> 0x42000), but the content under UBWC is corrupted (roundtrip — all zeros),
+# i.e. the flag is protection against corruption, keep False. results/test-r8-has8bpp-*.log.
 GEN2_PROPS = {"ubwc_unorm_snorm_int_compatible": True, "ubwc_all_formats_compatible": False,
               "has_8bpp_ubwc": False, "supports_uav_ubwc": True}
 
-# Формы блока, для которых в стоковом fd6_ubwc_compat_mode() есть строки:
-# (число каналов, бит на канал). Взят из списка case заголовка.
+# Block shapes for which the stock fd6_ubwc_compat_mode() has rows:
+# (number of channels, bits per channel). Taken from the case list of the header.
 SHAPES_IN_BLOB = {(2, 8), (4, 8), (2, 16), (4, 16), (1, 32), (2, 32), (4, 32)}
 
-# Форматы, для которых UBWC невозможен независимо от гейта (tu6_ubwc_possible).
+# Formats for which UBWC is impossible regardless of the gate (tu6_ubwc_possible).
 NO_UBWC_ALWAYS = ("BC", "ASTC", "ETC2", "EAC", "PVRTC", "G8_B8R8_2PLANE",
                   "G8_B8R8A8_2PLANE", "G16_B16R16_2PLANE_420", "G12B12G12B12_2PLANE_420",
                   "G10X6", "G16_B16R16_2PLANE_422", "G12B12G12B12_2PLANE_422",
@@ -69,55 +69,55 @@ NO_UBWC_ALWAYS = ("BC", "ASTC", "ETC2", "EAC", "PVRTC", "G8_B8R8_2PLANE",
 
 
 def is_compressed(f):
-    """Блок-компрессия или планарное видео: UBWC для них невозможен по
-    tu6_ubwc_possible() независимо от того, что решил гейт."""
+    """Block compression or planar video: UBWC is impossible for them per
+    tu6_ubwc_possible() regardless of what the gate decided."""
     return norm(f).startswith(NO_UBWC_ALWAYS)
 
 
 def why_unknown(f, props):
-    """Почему fd6_ubwc_compat_mode() отдаёт UNKNOWN для этого формата.
+    """Why fd6_ubwc_compat_mode() returns UNKNOWN for this format.
 
-    Это ключ к следующему рычагу: UNKNOWN означает «у blob-таблицы нет строки»,
-    и потому НЕ исправляется никаким правилом в драйвере — нужно либо найти
-    эквивалентный уже существующий класс, либо признать, что вопрос к железу.
+    This is the key to the next lever: UNKNOWN means "the blob table has no row",
+    and therefore NO rule in the driver fixes it — you either have to find an
+    equivalent class that already exists, or admit that the question goes to the hardware.
     """
     f, g = norm(f), stem(f)
     if is_compressed(f):
-        return "сжатый/плоский: UBWC невозможен"
+        return "compressed/planar: UBWC impossible"
     if re.fullmatch(r"R8(?:_[A-Z]+)?", g):
-        return "8 бит на блок: has_8bpp_ubwc=False (защита от порчи; memreq-потолок есть, содержимое под UBWC — все нули, test-r8-has8bpp-on.log)"
+        return "8 bits per block: has_8bpp_ubwc=False (protection against corruption; the memreq ceiling exists, content under UBWC — all zeros, test-r8-has8bpp-on.log)"
     if g in ("Z32_FLOAT", "Z24_UNORM_S8_UINT", "D24_UNORM_S8_UINT", "D32_SFLOAT",
              "X8_D24_UNORM_PACK32", "D16_UNORM"):
-        return "глубина: отдельная семантика clear"
+        return "depth: separate clear semantics"
     if f in ("R64_UINT", "R64_SINT") or g.startswith("R64G64"):
-        return "R64: UBWC запрещён"
+        return "R64: UBWC forbidden"
     if g.startswith("R16_UINT") or g.startswith("R16_SINT") or g.startswith("R16_SNORM") \
             or g == "R16_UNORM":
-        return "одноканальный 16 бит: строки в blob нет"
+        return "single-channel 16 bit: no row in blob"
     if g.startswith("R10G10B10A2") or g.startswith("A2B10G10R10") \
             or g.startswith("A2R10G10B10") or g.startswith("R11G11B10") \
             or g.startswith("R5G6B5") or g.startswith("B5G6R5") or g.startswith("B5G5R5A1") \
             or g.startswith("B4G4R4A4") or g.startswith("R4G4B4A4"):
-        return "packed-10/5/4 бит: строки в blob нет"
+        return "packed-10/5/4 bit: no row in blob"
     if g.startswith("R32G32B32") and "A32" not in g:
-        return "3-компонентный 32 бит: строки в blob нет"
+        return "3-component 32 bit: no row in blob"
     if re.fullmatch(r"R8G8B8_[A-Z]+", g) or re.fullmatch(r"B8G8R8_[A-Z]+", g):
-        return "3-компонентный 8 бит: строки в blob нет"
+        return "3-component 8 bit: no row in blob"
     if re.fullmatch(r"R16G16B16_[A-Z]+", g) or re.fullmatch(r"B16G16R16_[A-Z]+", g):
-        return "3-компонентный 16 бит: строки в blob нет"
+        return "3-component 16 bit: no row in blob"
     if g.startswith("R32_SFLOAT") or g.startswith("R32G32_FLOAT") \
             or g.startswith("R32G32B32A32_FLOAT") or g.startswith("R16G16_FLOAT") \
             or g.startswith("R16G16B16A16_FLOAT"):
-        return "_SFLOAT вне целочисленных классов (патч 0012)"
+        return "_SFLOAT outside the integer classes (patch 0012)"
     if g.startswith("B8G8R8A8") or g.startswith("B8G8R8X8"):
-        return "B8G8R8A8-семейство вне UNORM-класса (патч 0006)"
+        return "B8G8R8A8 family outside the UNORM class (patch 0006)"
     if re.fullmatch(r"[RGBA]\d+[RGBA]\d+[RGBA]\d+[RGBA]?\d*_[A-Z0-9_]+", g):
-        return "нет строки в blob"
-    return "нет строки в blob"
+        return "no row in blob"
+    return "no row in blob"
 
 
 def load_format_table(path):
-    """(pipe_format -> swap) для TILE6_LINEAR: третий аргумент _T_/VTC/TC."""
+    """(pipe_format -> swap) for TILE6_LINEAR: the third argument _T_/VTC/TC."""
     src = open(path).read()
     swap = {}
     srgb = {}
@@ -131,12 +131,12 @@ def load_format_table(path):
 
 
 def fd6_ubwc_compat_mode(fmt, props, patch_0006=False, patch_0010=False, patch_0011=False):
-    """Перенос fd6_ubwc_compat_mode() из freedreno_ubwc.h (сток).
+    """Port of fd6_ubwc_compat_mode() from freedreno_ubwc.h (stock).
 
-    patch_0010 — патч 0012 (был экспериментом 0008): включить _SFLOAT-
-    члены в целочисленные compat-классы.  Сток их не включает и для R32_FLOAT прямо пишет
-    «a630 blob allows these, but not a660» (a660 == наше семейство gen2),
-    так что это проверка гипотезы, а не перенос кода.
+    patch_0010 — patch 0012 (used to be experiment 0008): include the _SFLOAT
+    members in the integer compat classes.  Stock does not include them, and for R32_FLOAT it says directly
+    «a630 blob allows these, but not a660» (a660 == our gen2 family),
+    so this is a hypothesis test, not a port of code.
     """
     fmt = norm(fmt)
     ok = props["ubwc_unorm_snorm_int_compatible"]
@@ -180,25 +180,25 @@ def fd6_ubwc_compat_mode(fmt, props, patch_0006=False, patch_0010=False, patch_0
         return "R32G32B32A32_INT"
 
     if patch_0011:
-        # Одноканальный 16-битный и packed-10-битный.  Ни строки, ни даже
-        # упоминания в fd6_format_table.c, но замер на 740 (results/test-CEIL-
-        # stock.log, CEIL) показывает: одиночный образ R16_UNORM и
-        # A2B10G10R10_UNORM_PACK32 БЕЗ списка получают метаданные UBWC, то
-        # есть потолок есть, и его снимает именно гейт.  Все четыре варианта
-        # одного размера блока (16 бит) различаются только интерпретацией.
+        # Single-channel 16-bit and packed-10-bit.  No row, not even a
+        # mention in fd6_format_table.c, but a measurement on 740 (results/test-CEIL-
+        # stock.log, CEIL) shows: a lone R16_UNORM and
+        # A2B10G10R10_UNORM_PACK32 WITHOUT the list do get UBWC metadata, that is
+        # the ceiling exists, and it is exactly the gate that lifts it.  All four variants of
+        # the same block size (16 bits) differ only in interpretation.
         if fmt in ("R16_UNORM", "R16_SNORM", "R16_UINT", "R16_SINT",
                    "R16_FLOAT", "R16_SFLOAT"):
             return "R16_INT"
-        # norm() срезает _PACK32, поэтому имена уже без суффикса
+        # norm() strips _PACK32, so the names are already without the suffix
         if fmt in ("A2B10G10R10_UNORM", "A2B10G10R10_UINT",
                    "A2B10G10R10_SNORM", "R11G11B10_FLOAT"):
             return "A2B10G10R10_INT"
 
     if patch_0010:
-        # каст внутри одного layout — те же биты, другое прочтение.
-        # Z32_FLOAT НЕ трогаем: у него другая роль (depth), и сток
-        # объединяет его с R32_FLOAT только чтобы пометить как UNKNOWN.
-        # имена приходят и в pipe-виде (_FLOAT), и в вулканском (_SFLOAT)
+        # a cast within the same layout — the same bits, another reading.
+        # Z32_FLOAT is NOT touched: it has another role (depth), and stock
+        # merges it with R32_FLOAT only to mark it as UNKNOWN.
+        # names arrive both in pipe form (_FLOAT) and in Vulkan form (_SFLOAT)
         if fmt in ("R32_FLOAT", "R32_SFLOAT"):
             return "R32_INT"
         if fmt in ("R16G16_FLOAT", "R16G16_SFLOAT"):
@@ -213,7 +213,7 @@ def fd6_ubwc_compat_mode(fmt, props, patch_0006=False, patch_0010=False, patch_0
     if fmt in ("Z32_FLOAT", "R32_FLOAT"):
         return UNKNOWN
 
-    # семейство B8G8R8A8: сток — только UNORM/SRGB, стоковое B8G8R8A8_UNORM
+    # B8G8R8A8 family: stock — only UNORM/SRGB, stock B8G8R8A8_UNORM
     if fmt in ("B8G8R8A8_UNORM", "B8G8R8A8_SRGB"):
         return "B8G8R8A8_INT" if (patch_0006 and ok) else "B8G8R8A8_UNORM"
     if patch_0006:
@@ -226,7 +226,7 @@ def fd6_ubwc_compat_mode(fmt, props, patch_0006=False, patch_0010=False, patch_0
 
 
 def ubwc_compatible(formats, props, patch_0006, patch_0010=False, patch_0011=False):
-    """tu6_mutable_format_list_ubwc_compatible(): True => весь блок пропускается."""
+    """tu6_mutable_format_list_ubwc_compatible(): True => the whole block is skipped."""
     if not formats:
         return False
     if len(formats) == 1:
@@ -239,7 +239,7 @@ def ubwc_compatible(formats, props, patch_0006, patch_0010=False, patch_0011=Fal
 
 
 def ubwc_groups(formats, props, patch_0006=False, patch_0010=False, patch_0011=False):
-    """Разбивка списка по compat-режимам: [(режим, [форматы]), ...]."""
+    """Split of the list by compat modes: [(mode, [formats]), ...]."""
     groups = {}
     for f in formats:
         groups.setdefault(fd6_ubwc_compat_mode(f, props, patch_0006, patch_0010, patch_0011), []).append(f)
@@ -247,11 +247,11 @@ def ubwc_groups(formats, props, patch_0006=False, patch_0010=False, patch_0011=F
 
 
 def blockers(formats, props, patch_0006=False, patch_0010=False, patch_0011=False):
-    """Сигнатура того, что ломает гейт, плюс сами блокирующие пары.
+    """Signature of what breaks the gate, plus the blocking pairs themselves.
 
-    Сигнатура — отсортированный список (режим, первый формат этого режима).
-    Форматы с UNKNOWN выносятся в конец: для них blob-таблицы a630/a660 не
-    содержит строки вообще, поэтому никакое расширение правил их не закроет.
+    The signature — a sorted list of (mode, first format of that mode).
+    Formats with UNKNOWN are moved to the end: for them the a630/a660 blob
+    table has no row at all, so no rule extension will close them.
     """
     groups = ubwc_groups(formats, props, patch_0006, patch_0010, patch_0011)
     sig = tuple((mode, fmts[0]) for mode, fmts in groups)
@@ -263,7 +263,7 @@ def blockers(formats, props, patch_0006=False, patch_0010=False, patch_0011=Fals
 
 
 def report_blockers(swap, classes, props, patch_0006=False, patch_0010=False, patch_0011=False):
-    """Разбор классов, у которых гейт снимает UBWC, но тайлинг остаётся."""
+    """Analysis of classes where the gate removes UBWC but tiling stays."""
     rows = []
     for name, fmts in classes:
         if ubwc_compatible(fmts, props, patch_0006, patch_0010, patch_0011):
@@ -271,20 +271,20 @@ def report_blockers(swap, classes, props, patch_0006=False, patch_0010=False, pa
         sig, pairs, groups = blockers(fmts, props, patch_0006, patch_0010, patch_0011)
         rows.append((name, fmts, sig, pairs, groups))
     if not rows:
-        print("\n### Блокеры UBWC: таких классов нет\n")
+        print("\n### UBWC blockers: there are no such classes\n")
         return
-    print(f"\n### Что блокирует снятие UBWC: {len(rows)} классов\n")
-    print("A. Не блокер гейта: формату UBWC невозможен в принципе "
+    print(f"\n### What blocks UBWC removal: {len(rows)} classes\n")
+    print("A. Not a gate blocker: UBWC is impossible for the format in principle "
           "(tu6_ubwc_possible()).\n")
     hard = [r for r in rows if any(is_compressed(f) for f in r[1])]
     for name, fmts, sig, pairs, groups in hard:
         base = fmts[0]
-        print(f"  [{len(fmts)}] {name:26} базовый={base:16} {why_unknown(base, props)}")
-    print(f"  итого недостижимо: {len(hard)} классов из {len(rows)}\n")
+        print(f"  [{len(fmts)}] {name:26} base={base:16} {why_unknown(base, props)}")
+    print(f"  total unreachable: {len(hard)} classes out of {len(rows)}\n")
 
-    print("B. Блокер — сам гейт: список уходит в режим без UBWC, хотя каждый "
-          "формат по отдельности\n   UBWC держит. Это единственная группа, где "
-          "правка правила имеет смысл.\n")
+    print("B. The blocker is the gate itself: the list goes into a mode without UBWC, "
+          "although each format on its own\n   does hold UBWC. This is the only group "
+          "where editing the rule makes sense.\n")
     soft = [r for r in rows if r not in hard]
     buckets = {}
     for name, fmts, sig, pairs, groups in soft:
@@ -295,20 +295,20 @@ def report_blockers(swap, classes, props, patch_0006=False, patch_0010=False, pa
         for name, fmts, pairs in lst:
             why = why_unknown([f for m, f in sig if m == UNKNOWN][0], props) \
                 if any(m == UNKNOWN for m, _ in sig) else "?"
-            print(f"          {name:26} n={len(fmts):2}  причина UNKNOWN: {why}")
-    print(f"\n  итого блокером гейта: {len(soft)} из {len(rows)} классов")
+            print(f"          {name:26} n={len(fmts):2}  UNKNOWN reason: {why}")
+    print(f"\n  total blocked by the gate: {len(soft)} of {len(rows)} classes")
     return rows
 
 
 def report_0011(swap, classes, props):
-    """Что меняет эксперимент 0011: строки для R16_* и A2B10G10R10_*.
+    """What experiment 0011 changes: rows for R16_* and A2B10G10R10_*.
 
-    Основание — замер, а не рассуждение.  Проба CEIL (results/test-CEIL-
-    stock.log) показала, что одиночный R16_UNORM и A2B10G10R10_UNORM_PACK32 без
-    списка получают метаданные UBWC: потолок есть.  Список их снимает, потому
-    что fd6_ubwc_compat_mode() для них молчит.  В отличие от 0012 здесь не
-    нужно утверждать, что blob «allows but not a660»: форматы в blob-таблице не
-    упомянуты вообще, и A2B10G10R10 нет даже в fd6_format_table.c.
+    The basis is a measurement, not reasoning.  The CEIL probe (results/test-CEIL-
+    stock.log) showed that a lone R16_UNORM and A2B10G10R10_UNORM_PACK32 without
+    a list get UBWC metadata: the ceiling exists.  The list lifts it, because
+    fd6_ubwc_compat_mode() keeps silence for them.  Unlike 0012, here you do not
+    need to claim that the blob «allows but not a660»: the formats are not
+    mentioned in the blob table at all, and A2B10G10R10 is not even in fd6_format_table.c.
     """
     closed = []
     for name, fmts in classes:
@@ -316,30 +316,30 @@ def report_0011(swap, classes, props):
             continue
         if not ubwc_compatible(fmts, props, False, patch_0010=True, patch_0011=True):
             continue
-        # tu_image_init() отдаёт кортеж (Layout, сработал ли ранний выход), а
-        # вердикт здесь — про UBWC, то есть про ранний выход.
+        # tu_image_init() returns (Layout, whether the early exit fired), and the
+        # verdict here is about UBWC, i.e. about the early exit.
         _, early_before = tu_image_init(fmts[0], fmts, swap, props, patch_0010=True)
         _, early_after = tu_image_init(fmts[0], fmts, swap, props, patch_0010=True,
                                        patch_0011=True)
-        closed.append((name, fmts, "UBWC снят гейтом" if not early_before else "UBWC",
+        closed.append((name, fmts, "UBWC removed by the gate" if not early_before else "UBWC",
                        "tiled+UBWC" if early_after else "??"))
-    print(f"\n### Эксперимент 0011: закрывает {len(closed)} классов\n")
+    print(f"\n### Experiment 0011: closes {len(closed)} classes\n")
     for name, fmts, before, after in closed:
         print(f"  {name:24} n={len(fmts)}  {before}  ->  {after}")
     return closed
 
 
 def report_stack(swap, classes, props, patch_0011=False):
-    """Раскладка рабочего стека ArmadOS и разбор оставшихся tiled, no-UBWC.
+    """Layout of the ArmadOS working stack and analysis of the remaining tiled, no-UBWC.
 
-    Рабочий стек — 0004, 0005, 0006, 0009, 0010, 0012 (_SFLOAT).  0004 и 0007 на
-    раскладку не влияют: 0004 запрещает sparse, 0007 — только диагностика.
+    The working stack — 0004, 0005, 0006, 0009, 0010, 0012 (_SFLOAT).  0004 and 0007 do
+    not affect the layout: 0004 forbids sparse, 0007 is diagnostics only.
 
-    Группы порядят НЕ по префиксу имени.  Первая версия этого разбора так и
-    делала, и `G16_B16R16_2PLANE_420_UNORM` уехал в группу `R16_*`, а
-    `G8_B8R8_2PLANE_420_UNORM` — в `R8_*`, потому что `R16_` и `R8_` в них
-    встречаются как подстрока.  Проверка на сжатие идёт первой, форматы
-    плоского видео отсеиваются ею же.
+    The groups are ordered NOT by name prefix.  The first version of this analysis
+    did exactly that, and `G16_B16R16_2PLANE_420_UNORM` moved into the `R16_*`
+    group, and `G8_B8R8_2PLANE_420_UNORM` — into `R8_*`, because `R16_` and `R8_`
+    occur in them as substrings.  The compression check runs first, and planar
+    video formats are filtered out by it.
     """
     kw = dict(patch_0005=True, patch_0006=True, patch_0010=True, exp_0009=True)
     n_ubwc = n_lin = 0
@@ -353,23 +353,23 @@ def report_stack(swap, classes, props, patch_0011=False):
             n_lin += 1
             continue
         if any(is_compressed(f) for f in fmts):
-            fam = "сжатые и планарные: ubwc_possible() = false"
+            fam = "compressed and planar: ubwc_possible() = false"
         elif any(norm(f).startswith("R8_") for f in fmts):
-            fam = "R8_*: has_8bpp_ubwc = false, потолка нет"
+            fam = "R8_*: has_8bpp_ubwc = false, no ceiling"
         elif any("R32G32B32" in norm(f) for f in fmts):
-            fam = "R32G32B32_*: потолка нет"
+            fam = "R32G32B32_*: no ceiling"
         elif any(norm(f).startswith(("R16_", "A2B10G10R10", "R10G10B10A2"))
                  for f in fmts):
-            fam = "R16_* / R10G10B10A2_*: потолок есть, снимает гейт"
+            fam = "R16_* / R10G10B10A2_*: the ceiling exists, the gate lifts it"
         else:
-            # остаётся случай двух compat-классов в одном списке: vkd3d сам
-            # дописывает R32{U,I,F} ради typed UAV load
-            fam = "два compat-класса в одном списке (B8G8R8A8_UNORM + R32_*)"
+            # the case of two compat classes in one list remains: vkd3d appends
+            # R32{U,I,F} itself for the typed UAV load
+            fam = "two compat classes in one list (B8G8R8A8_UNORM + R32_*)"
         groups.setdefault(fam, []).append(name)
 
     rest = sum(len(v) for v in groups.values())
-    print(f"\n### Рабочий стек (0004, 0005, 0006, 0009, 0010"
-          f"{', 0011' if patch_0011 else ''}, 0012): из {len(classes)} классов")
+    print(f"\n### Working stack (0004, 0005, 0006, 0009, 0010"
+          f"{', 0011' if patch_0011 else ''}, 0012): of {len(classes)} classes")
     print(f"  UBWC: {n_ubwc}   linear: {n_lin}   tiled, no-UBWC: {rest}\n")
     for tag, lst in sorted(groups.items(), key=lambda x: -len(x[1])):
         print(f"  [{len(lst):2}] {tag}")
@@ -378,7 +378,7 @@ def report_stack(swap, classes, props, patch_0011=False):
 
 
 def geom(fmt):
-    """(байт на тексель, число каналов) — для tu_is_r8g8*."""
+    """(bytes per texel, number of channels) — for tu_is_r8g8*."""
     g = stem(fmt)
     m = re.fullmatch(r"[RAB](\d+)[RGB](\d+)[RGB](\d+)[AB](\d+)", g)
     if m:
@@ -393,7 +393,7 @@ def geom(fmt):
 
 
 def channels(fmt):
-    """Каналы в порядке памяти: R8G8B8A8 и B8G8R8A8 тут различаются."""
+    """Channels in memory order: R8G8B8A8 and B8G8R8A8 differ here."""
     g = stem(fmt)
     m = re.fullmatch(r"([RAB])(\d+)([RGB])(\d+)([RGB])(\d+)([AB])(\d+)", g)
     if m:
@@ -434,28 +434,28 @@ def has_swaps(formats, swap):
 
 
 def swaps_are_uniform(formats, swap, exp_0009=False):
-    """tu6_format_list_swaps_are_uniform() из патча 0005.
+    """tu6_format_list_swaps_are_uniform() from patch 0005.
 
-    exp_0009 — эксперимент 0009: формат с одним каналом не имеет порядка
-    каналов, поэтому его собственный swap не может поспорить с чужим; от него
-    требуется только совпадение формы блока (bits/width/height), потому что
-    раскладка тайла — функция размера блока (fd6_layout.c: layout->cpp).
+    exp_0009 — experiment 0009: a single-channel format has no channel order,
+    so its own swap cannot argue with a foreign one; only a match of the block
+    shape (bits/width/height) is required of it, because the tile layout is a
+    function of the block size (fd6_layout.c: layout->cpp).
     """
     if not formats or len(formats) < 2:
         return False
     if exp_0009:
-        # форма блока — это блок по размеру, а не вместе с числом каналов:
-        # раскладка тайла зависит только от util_format_get_blocksize()
+        # block shape is a block by size, not together with the channel count:
+        # the tile layout depends only on util_format_get_blocksize()
         block = lambda f: geom(f)[0]
         multi = [f for f in formats if len(channels(f)) > 1]
         if not multi:
-            # весь список одноканальный: спорить не о чем
+            # the whole list is single-channel: nothing to argue about
             return len({block(f) for f in formats}) == 1
         for f in formats:
             if block(f) != block(multi[0]):
                 return False
             if len(channels(f)) < 2:
-                continue   # порядка каналов нет — спорить не о чем
+                continue   # no channel order — nothing to argue about
             if len(channels(f)) != len(channels(multi[0])):
                 return False
             if table_lookup(swap, f) != table_lookup(swap, multi[0]):
@@ -472,7 +472,7 @@ def swaps_are_uniform(formats, swap, exp_0009=False):
 
 
 class Layout:
-    """Что решил драйвер для образа: тайлинг, UBWC и бит MUTABLEEN."""
+    """What the driver decided for the image: tiling, UBWC and the MUTABLEEN bit."""
 
     __slots__ = ("ubwc", "tiled", "branch", "mutable")
 
@@ -491,35 +491,35 @@ class Layout:
 def tu_image_init(base, formats, swap, props, patch_0005=False, patch_0006=False,
                   patch_0009=True, patch_0010=False, patch_0011=False,
                   exp_0009=False, exp_0010=False):
-    """Возвращает (Layout, сработал ли ранний выход)."""
+    """Returns (Layout, whether the early exit fired)."""
     if ubwc_compatible(formats, props, patch_0006, patch_0010, patch_0011):
-        return Layout(True, True, "ранний выход: список UBWC-совместим"), True
+        return Layout(True, True, "early exit: list is UBWC-compatible"), True
 
     if base == NV12_VK:
-        # сток: force_linear_tile = true; патч 0009 оставляет тайлинг
+        # stock: force_linear_tile = true; patch 0009 keeps the tiling
         return Layout(False, patch_0009, "NV12"), False
 
     if props["ubwc_all_formats_compatible"]:
         return Layout(True, True, "ubwc_all_formats_compatible"), False
 
     tiled = True
-    branch = "только снятие UBWC"
+    branch = "UBWC removal only"
     if reinterprets_r8g8_r16(base, formats):
         tiled, branch = False, "r8g8↔r16"
     elif has_swaps(formats, swap) and (not patch_0005 or
                                        not swaps_are_uniform(formats, swap, exp_0009)):
-        tiled, branch = False, "has_swaps" + ("" if patch_0005 else " (сток)")
-    # эксп. 0010 ставит is_mutable = true в этой же ветке, где UBWC уже снят.
-    # Тайлинг он не трогает, а на ген2 при расходящихся swap'ах только ломает
-    # содержимое (docs/analysis.md §21.4), поэтому в модели он отмечен флагом,
-    # а не подменой раскладки.
+        tiled, branch = False, "has_swaps" + ("" if patch_0005 else " (stock)")
+    # exp. 0010 sets is_mutable = true in this very branch, where UBWC is already
+    # removed. It does not touch tiling, and on gen2 with diverging swaps it only
+    # breaks the content (docs/analysis.md §21.4), so in the model it is marked
+    # with a flag, not by substituting the layout.
     return Layout(False, tiled, branch, mutable=exp_0010), False
 
 
 def forces_linear(base, formats, swap, props, patch_0005=False, patch_0006=False, exp_0009=False):
-    """tu6_mutable_format_list_forces_linear(): sparse-запрос из патча 0004."""
+    """tu6_mutable_format_list_forces_linear(): sparse request from patch 0004."""
     if ubwc_compatible(formats, props, patch_0006):
-        return False, "ранний выход"
+        return False, "early exit"
     if re.fullmatch(r"D16|D24|D32|S8|X8_D24", base):
         return False, "depth/stencil"
     if base == NV12_VK:
@@ -530,8 +530,8 @@ def forces_linear(base, formats, swap, props, patch_0005=False, patch_0006=False
         return True, "r8g8↔r16"
     if has_swaps(formats, swap) and (not patch_0005 or
                                     not swaps_are_uniform(formats, swap, exp_0009)):
-        return True, "has_swaps" + ("" if patch_0005 else " (сток)")
-    return False, "нет триггера"
+        return True, "has_swaps" + ("" if patch_0005 else " (stock)")
+    return False, "no trigger"
 
 
 def load_vkd3d_classes(path):
@@ -544,7 +544,7 @@ def load_vkd3d_classes(path):
 
 
 def norm(fmt):
-    """Имя из таблицы pipe-форматов: убрать вулкан'sкие _PACK16/_PACK32."""
+    """Name from the pipe format table: strip the Vulkan _PACK16/_PACK32."""
     return re.sub(r"_PACK(16|32)$", "", fmt)
 
 
@@ -552,7 +552,7 @@ INTYPES = ("_UNORM", "_SNORM", "_UINT", "_SINT", "_SFLOAT", "_SRGB")
 
 
 def stem(fmt):
-    """Имя каналов без хвоста интерпретации: A8R8G8B8_UNORM_SRGB -> A8R8G8B8."""
+    """Channel name without the interpretation tail: A8R8G8B8_UNORM_SRGB -> A8R8G8B8."""
     g = norm(fmt)
     while True:
         for t in INTYPES:
@@ -568,12 +568,12 @@ def table_lookup(table, fmt):
 
 
 def zink_srgb_pairs(swap):
-    """Пары, которые строит setup_format_list(): формат + его sRGB-вариант.
+    """Pairs that setup_format_list() builds: format + its sRGB variant.
 
-    Zink: srgb = util_format_srgb(templ->format), и в список идут ровно эти
-    два формата. util_format_linear() убирает хвост "_SRGB" (либо добавляет
-    "_UNORM", если хвоста не было), так что пара всегда (F, F_SRGB) с одним
-    и тем же порядком каналов.
+    Zink: srgb = util_format_srgb(templ->format), and exactly these
+    two formats go into the list. util_format_linear() strips the "_SRGB" tail (or
+    adds "_UNORM" if there was no tail), so the pair is always (F, F_SRGB) with
+    one and the same channel order.
     """
     pairs = []
     for fmt in sorted(swap):
@@ -586,7 +586,7 @@ def zink_srgb_pairs(swap):
 
 
 def report_vkd3d(swap, classes, props, exp_0009=False, exp_0010=False):
-    print(f"### vkd3d: {len(classes)} классов из tests/vkd3d-fmt-classes.h\n")
+    print(f"### vkd3d: {len(classes)} classes from tests/vkd3d-fmt-classes.h\n")
     groups = {}
     for name, fmts in classes:
         base = fmts[0]
@@ -601,16 +601,16 @@ def report_vkd3d(swap, classes, props, exp_0009=False, exp_0010=False):
                str(p10) if p10 else "", stock.branch)
         groups.setdefault(key, []).append(name)
     for (early, a, b, c, d, e, branch), names in sorted(groups.items(), key=lambda x: -len(x[1])):
-        head = "ранний выход, " if early else ""
-        tail = f" -> +эксп.0009 {d}" if d else ""
-        tail += f" -> +эксп.0010 {e}" if e else ""
+        head = "early exit, " if early else ""
+        tail = f" -> +exp.0009 {d}" if d else ""
+        tail += f" -> +exp.0010 {e}" if e else ""
         print(f"[{len(names):3}] {head}{a} -> +0005 {b} -> +0005+0006 {c}{tail}   ({branch})")
         if len(names) <= 6:
             print(f"        {', '.join(names)}")
     linear = [n for n, f in classes if not tu_image_init(f[0], f, swap, props)[0].tiled]
-    print(f"\nв linear на стоке: {len(linear)} из {len(classes)}")
+    print(f"\nin linear on stock: {len(linear)} of {len(classes)}")
     if exp_0009:
-        # что именно переворачивает эксперимент 0009
+        # what exactly experiment 0009 flips
         flipped = []
         for name, fmts in classes:
             base = fmts[0]
@@ -618,18 +618,18 @@ def report_vkd3d(swap, classes, props, exp_0009=False, exp_0010=False):
             b = tu_image_init(base, fmts, swap, props, patch_0005=True, exp_0009=True)[0]
             if a.tiled != b.tiled:
                 flipped.append((name, str(a), str(b)))
-        print(f"эксп.0009 переворачивает {len(flipped)} классов:")
+        print(f"exp.0009 flips {len(flipped)} classes:")
         for name, a, b in flipped:
             print(f"        {name}: {a} -> {b}")
         left = [n for n, f in classes
                 if not tu_image_init(f[0], f, swap, props, patch_0005=True, exp_0009=True)[0].tiled]
-        print(f"в linear с эксп.0009: {len(left)} из {len(classes)} -> {', '.join(left)}")
+        print(f"in linear with exp.0009: {len(left)} of {len(classes)} -> {', '.join(left)}")
     return linear
 
 
 def report_zink(swap, props):
     pairs = zink_srgb_pairs(swap)
-    print(f"\n### Zink: setup_format_list() строит {len(pairs)} пар «формат + sRGB-вариант»\n")
+    print(f"\n### Zink: setup_format_list() builds {len(pairs)} pairs «format + sRGB variant»\n")
     buckets = {}
     for a, b in pairs:
         base = a
@@ -639,20 +639,20 @@ def report_zink(swap, props):
         key = (early, str(stock), str(p5), str(p56))
         buckets.setdefault(key, []).append(f"{a} + {b}")
     for key, lst in sorted(buckets.items(), key=lambda x: -len(x[1])):
-        early = "ранний выход, " if key[0] else ""
+        early = "early exit, " if key[0] else ""
         print(f"[{len(lst):3}] {early}{key[1]} -> +0005 {key[2]} -> +0005+0006 {key[3]}")
         for e in lst[:5]:
             print(f"        {e}")
         if len(lst) > 5:
-            print(f"        … ещё {len(lst) - 5}")
+            print(f"        … {len(lst) - 5} more")
 
-    print("\n### Zink: прочие случаи\n")
+    print("\n### Zink: other cases\n")
     cases = [
-        ("ZINK_BIND_MUTABLE: MUTABLE без списка (init_ici обнуляет pNext)", "R8G8B8A8_UNORM", None),
-        ("видео NV12: плоскости одного формата", NV12_VK, [NV12_VK, "R8_UNORM", "R8G8_UNORM"]),
-        ("кросс-порядок {BGRA8, RGBA8}", "R8G8B8A8_UNORM", ["B8G8R8A8_UNORM", "R8G8B8A8_UNORM"]),
+        ("ZINK_BIND_MUTABLE: MUTABLE without a list (init_ici zeroes pNext)", "R8G8B8A8_UNORM", None),
+        ("video NV12: planes of the same format", NV12_VK, [NV12_VK, "R8_UNORM", "R8G8_UNORM"]),
+        ("cross-order {BGRA8, RGBA8}", "R8G8B8A8_UNORM", ["B8G8R8A8_UNORM", "R8G8B8A8_UNORM"]),
         ("uniform-swap {BGRA8_UNORM, BGRA8_UINT}", "B8G8R8A8_UNORM", ["B8G8R8A8_UNORM", "B8G8R8A8_UINT"]),
-        ("BGR-семейство {B5G6R5, B5G5R5A1}", "B5G6R5_UNORM", ["B5G6R5_UNORM", "B5G5R5A1_UNORM"]),
+        ("BGR family {B5G6R5, B5G5R5A1}", "B5G6R5_UNORM", ["B5G6R5_UNORM", "B5G5R5A1_UNORM"]),
     ]
     for name, base, fmts in cases:
         stock, _ = tu_image_init(base, fmts, swap, props)
@@ -663,17 +663,17 @@ def report_zink(swap, props):
         fl_stock, _ = forces_linear(base, fmts, swap, props)
         fl_p5, _ = forces_linear(base, fmts, swap, props, patch_0005=True)
         fl_p59, _ = forces_linear(base, fmts, swap, props, patch_0005=True, exp_0009=True)
-        print(f"{name}\n    create:   сток {stock:16} +0005 {p5:16} +0006 {p6:16} +0005+0006 {p56:16}"
-              f"\n    эксп.0009: {p59:16}"
-              f"\n    sparse:   сток forces_linear={fl_stock!s:5} +0005 {fl_p5!s:5} +эксп.0009 {fl_p59!s:5}")
-    print("\n    ZINK_BIND_MUTABLE создаётся, когда zink_format_needs_mutable() истинно:")
-    print("    пары x8/alpha-эмуляции дают false, то есть mutable не нужен; значит список")
-    print("    либо совместим (sRGB), либо отсутствует вовсе.")
+        print(f"{name}\n    create:   stock {stock:16} +0005 {p5:16} +0006 {p6:16} +0005+0006 {p56:16}"
+              f"\n    exp.0009: {p59:16}"
+              f"\n    sparse:   stock forces_linear={fl_stock!s:5} +0005 {fl_p5!s:5} +exp.0009 {fl_p59!s:5}")
+    print("\n    ZINK_BIND_MUTABLE is created when zink_format_needs_mutable() is true:")
+    print("    the x8/alpha-emulation pairs give false, i.e. mutable is not needed; so the list")
+    print("    is either compatible (sRGB), or absent altogether.")
 
 
 def report_all_pairs(swap, props):
     fmts = sorted(swap)
-    print(f"\n### Все {len(fmts)}x{len(fmts) - 1} упорядоченных пар форматов из fd6_format_table.c\n")
+    print(f"\n### All {len(fmts)}x{len(fmts) - 1} ordered format pairs from fd6_format_table.c\n")
     buckets = {}
     for a, b in itertools.permutations(fmts, 2):
         pair = [a, b]
@@ -681,55 +681,55 @@ def report_all_pairs(swap, props):
         p5, _ = tu_image_init(a, pair, swap, props, patch_0005=True)
         p6, _ = tu_image_init(a, pair, swap, props, patch_0006=True)
         if early:
-            kind = "ранний выход (tiled+UBWC)"
+            kind = "early exit (tiled+UBWC)"
         elif not has_swaps(pair, swap):
-            kind = "swap'ов нет: UBWC снимается, тайлинг остаётся — патчи ни при чём"
+            kind = "no swaps: UBWC is removed, tiling stays — the patches have nothing to do with it"
         elif swaps_are_uniform(pair, swap):
-            kind = "uniform-swap: сток linear -> +0005 tiled -> +0006 %s" % ("linear" if not p6.tiled else "tiled+UBWC")
+            kind = "uniform-swap: stock linear -> +0005 tiled -> +0006 %s" % ("linear" if not p6.tiled else "tiled+UBWC")
         else:
-            kind = "кросс-порядок: linear у всех (эксперимент cross-order)"
+            kind = "cross-order: linear for everyone (cross-order experiment)"
         buckets.setdefault(kind, []).append((a, b, stock.tiled, p5.tiled, p6.tiled))
     for kind, lst in sorted(buckets.items(), key=lambda x: -len(x[1])):
         print(f"[{len(lst):6}] {kind}")
         for e in lst[:6]:
-            print(f"          {e[0]} + {e[1]}  (tiled: сток={e[2]} 0005={e[3]} 0006={e[4]})")
+            print(f"          {e[0]} + {e[1]}  (tiled: stock={e[2]} 0005={e[3]} 0006={e[4]})")
         if len(lst) > 6:
-            print(f"          … ещё {len(lst) - 6}")
+            print(f"          … {len(lst) - 6} more")
     fixed5 = [(a, b) for lst in buckets.values() for a, b, s, p5, _ in lst if s == False and p5]
     fixed6 = [(a, b) for lst in buckets.values() for a, b, s, _, p6 in lst if s == False and p6]
     only5 = [x for x in fixed5 if x not in set(fixed6)]
-    print(f"\n0005 возвращает тайлинг: {len(fixed5)} пар, из них только 0005 — {len(only5)}")
-    print(f"0006 возвращает тайлинг: {len(fixed6)} пар (списки B8G8R8A8 с UNORM/SRGB/SNORM/UINT/SINT)")
+    print(f"\n0005 returns tiling: {len(fixed5)} pairs, of which only 0005 — {len(only5)}")
+    print(f"0006 returns tiling: {len(fixed6)} pairs (B8G8R8A8 lists with UNORM/SRGB/SNORM/UINT/SINT)")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--table", default=DEFAULT_TABLE, help="путь к fd6_format_table.c")
+    ap.add_argument("--table", default=DEFAULT_TABLE, help="path to fd6_format_table.c")
     ap.add_argument("--classes", default=os.path.join(REPO, "tests", "vkd3d-fmt-classes.h"))
-    ap.add_argument("--all-pairs", action="store_true", help="перебрать все пары форматов")
+    ap.add_argument("--all-pairs", action="store_true", help="enumerate all format pairs")
     ap.add_argument("--exp-0009", action="store_true",
-                    help="эксперимент 0009: одноканальный формат не выводит список в linear")
+                    help="experiment 0009: a single-channel format does not push the list into linear")
     ap.add_argument("--exp-0010", action="store_true",
-                    help="эксперимент 0010: MUTABLEEN без UBWC в ветке !mutable_ubwc_fc")
+                    help="experiment 0010: MUTABLEEN without UBWC in the !mutable_ubwc_fc branch")
     ap.add_argument("--blockers", action="store_true",
-                    help="разбор классов, где гейт снимает UBWC, но тайлинг остаётся")
+                    help="analysis of classes where the gate removes UBWC but tiling stays")
     ap.add_argument("--exp-0011", action="store_true",
-                    help="эксперимент 0011: строки для одноканального 16-битного "
-                         "и packed-10-битного в fd6_ubwc_compat_mode()")
+                    help="experiment 0011: rows for the single-channel 16-bit "
+                         "and packed-10-bit in fd6_ubwc_compat_mode()")
     ap.add_argument("--stack", action="store_true",
-                    help="раскладка рабочего стека и разбор оставшихся "
-                         "tiled, no-UBWC классов")
+                    help="layout of the working stack and analysis of the remaining "
+                         "tiled, no-UBWC classes")
     args = ap.parse_args()
 
     if not os.path.exists(args.table):
-        sys.exit(f"нет таблицы форматов: {args.table}\n"
-                 f"укажи --table PATH (в дереве Mesa: src/freedreno/fdl/fd6_format_table.c)")
+        sys.exit(f"no format table: {args.table}\n"
+                 f"pass --table PATH (in the Mesa tree: src/freedreno/fdl/fd6_format_table.c)")
 
     swap, _ = load_format_table(args.table)
-    print(f"свойства GPU: FD740 = [a7xx_base, a7xx_gen2] -> {GEN2_PROPS}")
+    print(f"GPU properties: FD740 = [a7xx_base, a7xx_gen2] -> {GEN2_PROPS}")
     if args.exp_0009 or args.exp_0010:
-        print(f"эксперименты: 0009={'вкл' if args.exp_0009 else 'выкл'} "
-              f"0010={'вкл' if args.exp_0010 else 'выкл'}")
+        print(f"experiments: 0009={'on' if args.exp_0009 else 'off'} "
+              f"0010={'on' if args.exp_0010 else 'off'}")
     print()
 
     if os.path.exists(args.classes):
@@ -740,11 +740,11 @@ def main():
         if args.blockers:
             print("\n" + "=" * 78)
             report_blockers(swap, classes, GEN2_PROPS)
-            print("\n" + "-" * 78 + "\nс патчем 0012 (_SFLOAT -> целочисленные классы):")
+            print("\n" + "-" * 78 + "\nwith patch 0012 (_SFLOAT -> integer classes):")
             report_blockers(swap, classes, GEN2_PROPS, patch_0010=True)
             if args.exp_0011:
-                print("\n" + "-" * 78 + "\nи с экспериментом 0011 (одноканальный 16 бит "
-                      "+ packed-10 бит):")
+                print("\n" + "-" * 78 + "\nand with experiment 0011 (single-channel 16 bit "
+                      "+ packed-10 bit):")
                 report_blockers(swap, classes, GEN2_PROPS, patch_0010=True, patch_0011=True)
     if args.stack:
         report_stack(swap, classes, GEN2_PROPS, patch_0011=args.exp_0011)

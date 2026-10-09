@@ -1,7 +1,8 @@
-0007: TU_FORCE_PROPS — форсировать свойства драйвера из переменной
-окружения.
+0007: TU_FORCE_PROPS - force driver properties from an environment
+variable.
 
-Связи: нет — правит только диагностику и на список форматов не влияет.
+Relations: none - touches only diagnostics, does not affect format
+lists.
 
 diff --git a/src/freedreno/vulkan/tu_device.cc b/src/freedreno/vulkan/tu_device.cc
 index 3c904bf3d70..07f36d2c44d 100644
@@ -21,25 +22,25 @@ index 3c904bf3d70..07f36d2c44d 100644
  };
  
 +/**
-+ * TU_FORCE_PROPS — принудительно поднимает булевы флаги fd6_gpu_info, которых
-+ * нет в таблице устройства.
++ * TU_FORCE_PROPS - forcibly raises the boolean fd6_gpu_info flags that are
++ * missing from the device table.
 + *
-+ * Зачем: значения в freedreno_devices.py — это наблюдения из блоба Qualcomm для
-+ * конкретного чипа, а не деление по поколению. Поэтому неизвестно, умеет ли
-+ * наш чип то, что заявлено только для соседнего (например, a750 в
-+ * a7xx_gen3 имеет load_shader_consts_via_preamble и has_generic_clear, а
-+ * наш a740 в a7xx_gen2 — нет). Переопределение позволяет проверить такую
-+ * гипотезу одной пересборкой, а не пересборкой на каждый флаг.
++ * Why: the values in freedreno_devices.py are observations of the Qualcomm
++ * blob for a specific chip, not a generational split. So it is unknown
++ * whether our chip supports what is only declared for a neighbour (e.g. a750
++ * in a7xx_gen3 has load_shader_consts_via_preamble and has_generic_clear,
++ * while our a740 in a7xx_gen2 does not). The override lets one test such a
++ * hypothesis with a single rebuild instead of one rebuild per flag.
 + *
-+ * Значение — имена через запятую, неизвестные имена ругаются в лог. Всё, что
-+ * применилось, тоже печатается, чтобы по логу было видно, что флаг реально
-+ * учтён, а не молча проигнорирован.
++ * The value is a comma-separated list of names; unknown names are reported
++ * in the log. Everything that applied is printed too, so the log shows that
++ * the flag was actually taken into account rather than silently ignored.
 + *
-+ * TU_MAX_DRAW_STATES — отдельно, потому что это число, а не флаг.
++ * TU_MAX_DRAW_STATES is handled separately: it is a number, not a flag.
 + *
-+ * ВАЖНО: переопределение ничем не проверяется. Неверный флаг даёт визуальную
-+ * порчу или зависание GPU. Корректность проверяется тестами (scripts/
-+ * run-test.sh), а не этим кодом.
++ * IMPORTANT: the override is not validated by anything. A wrong flag causes
++ * visual corruption or a GPU hang. Correctness is verified by the tests
++ * (scripts/run-test.sh), not by this code.
 + */
 +static void
 +tu_force_props(struct fd_dev_info *info)
@@ -91,9 +92,9 @@ index 3c904bf3d70..07f36d2c44d 100644
 +
 +         *flags[i].val = true;
 +
-+         /* VPC в GMEM без размеров буфера бесполезен: кеш не выделяется, а
-+          * обращения к нему идут по нулевому размеру. Подставляем значения
-+          * a750 (a7xx_gen3), если их не задали явно, и говорим об этом.
++         /* VPC in GMEM without buffer sizes is useless: the cache is not
++          * allocated, while accesses go by a zero size. We substitute the
++          * a750 (a7xx_gen3) values if not set explicitly, and say so.
 +          */
 +         if (!strcmp(item, "has_gmem_vpc_attr_buf")) {
 +            if (!info->props.sysmem_vpc_attr_buf_size)
@@ -111,7 +112,7 @@ index 3c904bf3d70..07f36d2c44d 100644
 +      }
 +
 +      if (!found)
-+         mesa_logw("TU_FORCE_PROPS: неизвестный флаг '%s'", item);
++         mesa_logw("TU_FORCE_PROPS: unknown flag '%s'", item);
 +   }
 +
 +   free(buf);
