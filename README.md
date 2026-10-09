@@ -27,7 +27,7 @@ as zeros.
 |---|---|
 | `docs/analysis.md` | the analysis: symptom, cause, measurements, applicability boundaries, reproduction; `docs/rp6-vkd3d-analysis.md` - the original short analysis (21.09.2026) it grew out of |
 | `patches/` | 0001-0012 - the Mesa patches that ship; `PATCHES.md` - the origin of 0001-0003 |
-| `experiments/` | 0001-0011 - **not** for commit: reproducible checks of the analysis' conclusions |
+| `experiments/` | 0001-0011 plus two unnumbered probes (former 0006 and 0007) - **not** for commit: reproducible checks of the analysis' conclusions |
 | `tests/` | `rp6-vkd3d-sparse-test.c` + shaders; every result was obtained with it |
 | `scripts/` | build and runs, including the experiment script and game launch |
 | `container/` | toolchain Containerfile (there is no compiler on the device) |
@@ -168,7 +168,10 @@ meaning**: the patch `0006-turnip-b8g8r8a8-int-compat-type.patch` adds
 separate probe `experiments/experiment-cross-order-list-tiled-ubwc.patch`
 (its number was deliberately removed; analysis - `docs/analysis.md`,
 §16, §16.1 and §16.2: neither vkd3d nor Zink has any consumers of such
-lists).
+lists). Likewise `experiments/experiment-nv12-keep-tiling.patch` used to
+be 0007 (colliding with patch 0007, `TU_FORCE_PROPS`) and was
+renumbered out — its change shipped verbatim as `patches/0009`, so
+nothing but history is left there.
 
 ### About the build image
 
