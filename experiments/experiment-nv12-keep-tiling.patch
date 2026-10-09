@@ -1,4 +1,4 @@
-EXPERIMENT 0007 - NOT FOR COMMIT. NV12 + MUTABLE: keep tiling, drop only UBWC.
+NV12 + MUTABLE: keep tiling, drop only UBWC. NOT FOR COMMIT.
 
 The code argument for a driver-side fix of the planar branch (probe N2) is
 that for a planar base format MUTABLE changes only the *compression*, not the
